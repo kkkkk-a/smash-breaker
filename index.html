@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>スマッシュブレイカー</title>
+    <!-- PeerJS -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* オンライン用追加スタイル (日本語フォント調整) */
+        body { font-family: 'Orbitron', 'Noto Sans JP', sans-serif; }
+        .btn, .sys-msg, .net-status { font-family: 'Noto Sans JP', sans-serif; font-weight: bold; }
+        
+        #screen-network { background: rgba(10, 20, 30, 0.95); z-index: 30; }
+        .id-box { 
+            background: #000; border: 1px dashed var(--primary-x); padding: 15px; 
+            margin: 10px 0; user-select: text; font-family: 'Orbitron', monospace; font-size: 1.2rem; word-break: break-all;
+            color: var(--primary-x);
+        }
+        .net-status { color: var(--accent-gold); font-size: 0.9rem; margin-top: 5px; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+        input.room-input {
+            background: #222; border: 1px solid #555; color: #fff; padding: 10px;
+            font-size: 1.2rem; width: 250px; text-align: center; margin-bottom: 10px;
+            font-family: 'Orbitron', sans-serif;
+        }
+        /* 再戦ステータス表示 */
+        #rematch-msg {
+            color: var(--accent-gold); font-size: 0.9rem; margin-bottom: 10px; height: 1.5em;
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+        /* 日本語化に伴う文字サイズ調整 */
+        .game-title span { font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+
+    <div class="app-container">
+        <!-- タイトル画面 -->
+        <div id="screen-mode" class="screen active panel-glass">
+            <h1 class="game-title">スマッシュブレイカー</h1>
+            <div class="menu-grid">
+                <button class="btn" onclick="GameApp.start('normal')">ブロック崩し</button>
+                <button class="btn" onclick="GameApp.start('endless')">エンドレスブロック崩し</button>
+                <div class="spacer"></div>
+                <button class="btn btn-vs" onclick="GameApp.start('local-vs')">ローカル対戦 (2P)</button>
+                <button class="btn btn-net" onclick="Network.openMenu()">オンライン対戦</button>
+                <div class="spacer"></div>
+                <button class="btn btn-gold" onclick="GameApp.openEditor()">パドル工房 (作成)</button>
+                <button class="btn btn-sub" onclick="GameApp.openSettings()">プリセット選択</button>
+            </div>
+            <div class="controls-info">
+                [P1] 矢印 / WASD + Shift/Space &nbsp;|&nbsp; [P2] WASD + Shift
+            </div>
+        </div>
+
+        <!-- オンラインメニュー -->
+        <div id="screen-network" class="screen panel-glass">
+            <h2>NETWORK SYSTEM</h2>
+            
+            <div id="net-menu-init" class="menu-grid">
+                <button class="btn btn-net" onclick="Network.initHost()">ルーム作成 (ホスト)</button>
+                <div class="divider">または</div>
+                <input type="text" id="net-room-id" class="room-input" placeholder="ホストIDを入力">
+                <button class="btn btn-net" onclick="Network.joinRoom()">ルーム参加 (ゲスト)</button>
+                <button class="btn btn-back" onclick="Network.closeMenu()">戻る</button>
+            </div>
+
+            <div id="net-menu-host" class="menu-grid" style="display:none; text-align:center;">
+                <p class="sys-msg">以下のIDを対戦相手に伝えてください</p>
+                <div id="host-id-display" class="id-box">生成中...</div>
+                <div class="net-status">対戦相手の接続を待機中...</div>
+                <button class="btn btn-back" onclick="location.reload()">キャンセル</button>
+            </div>
+
+            <div id="net-menu-connecting" class="menu-grid" style="display:none; text-align:center;">
+                <div class="net-status" style="color:#00f3ff;">接続を確立中...</div>
+            </div>
+        </div>
+
+        <!-- パドル工房 -->
+        <div id="screen-editor" class="screen panel-glass">
+            <h2>PADDLE FACTORY</h2>
+            <div class="editor-layout">
+                <div class="editor-container">
+                    <div id="pixel-grid"></div>
+                    <div id="color-palette"></div>
+                </div>
+                <div class="menu-grid editor-btns">
+                    <button class="btn btn-gold" onclick="GameApp.applyCustomPaddle()">装備してゲームへ</button>
+                    <div class="btn-row">
+                        <button class="btn btn-sub" onclick="GameApp.savePaddleWebP()">画像保存</button>
+                        <button class="btn btn-sub" onclick="document.getElementById('paddle-webp-input').click()">画像読込</button>
+                    </div>
+                    <div class="btn-row">
+                        <button class="btn btn-sub" onclick="GameApp.savePaddleJSON()">データ保存</button>
+                        <button class="btn btn-sub" onclick="document.getElementById('paddle-file-input').click()">データ読込</button>
+                    </div>
+                    <button class="btn btn-warn" onclick="GameApp.clearEditor()">全消去</button>
+                    <button class="btn btn-back" onclick="GameApp.closeEditor()">戻る</button>
+                </div>
+            </div>
+            <input type="file" id="paddle-file-input" accept=".json" style="display: none;">
+            <input type="file" id="paddle-webp-input" accept="image/webp,image/png" style="display: none;">
+        </div>
+
+        <!-- 設定画面 -->
+        <div id="screen-settings" class="screen panel-glass">
+            <h2>SELECT MODULE</h2>
+            <div class="shape-grid" id="shape-selector"></div>
+            <button class="btn btn-back" onclick="GameApp.closeSettings()" style="margin-top:20px;">戻る</button>
+        </div>
+
+        <!-- ゲーム画面 -->
+        <div id="screen-game" class="screen">
+            <div class="game-wrapper panel-glass">
+                <div class="hud">
+                    <div id="hud-left" class="hud-item">STAGE 1</div>
+                    <div id="hud-center" class="hud-item hud-vs" style="display:none;">VS MODE</div>
+                    <div id="hud-right" class="hud-item">SCORE: 0</div>
+                </div>
+                
+                <canvas id="game-canvas"></canvas>
+                
+                <button id="btn-mobile-charge" class="mobile-btn">チャージ</button>
+                
+                <div id="overlay" class="overlay">
+                    <h2 id="overlay-title">GAME OVER</h2>
+                    <div class="result-box" id="overlay-stats"></div>
+                    
+                    <div class="menu-grid" style="width: 280px;">
+                        <!-- 再戦用メッセージエリア -->
+                        <div id="rematch-msg"></div>
+                        
+                        <button id="btn-retry" class="btn" onclick="GameApp.retry()">リトライ</button>
+                        <button class="btn btn-net" onclick="GameApp.shareScore()">スコア共有 (X)</button>
+                        <button class="btn btn-back" onclick="GameApp.toTitle()">タイトルへ</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="audio.js"></script>
+    <script src="core.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

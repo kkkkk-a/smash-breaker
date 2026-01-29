@@ -3,168 +3,405 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>スマッシュブレイカー</title>
-    <link rel="icon" href="icon.png" type="image/png">
-    <!-- PeerJS -->
+    <title>スマッシュブレイカー (日本語版)</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-    <style>
-        /* オンライン用追加スタイル (日本語フォント調整) */
-        body { font-family: 'Orbitron', 'Noto Sans JP', sans-serif; }
-        .btn, .sys-msg, .net-status { font-family: 'Noto Sans JP', sans-serif; font-weight: bold; }
-        
-        #screen-network { background: rgba(10, 20, 30, 0.95); z-index: 30; }
-        .id-box { 
-            background: #000; border: 1px dashed var(--primary-x); padding: 15px; 
-            margin: 10px 0; user-select: text; font-family: 'Orbitron', monospace; font-size: 1.2rem; word-break: break-all;
-            color: var(--primary-x);
-        }
-        .net-status { color: var(--accent-gold); font-size: 0.9rem; margin-top: 5px; animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0.5; } }
-        input.room-input {
-            background: #222; border: 1px solid #555; color: #fff; padding: 10px;
-            font-size: 1.2rem; width: 250px; text-align: center; margin-bottom: 10px;
-            font-family: 'Orbitron', sans-serif;
-        }
-        /* 再戦ステータス表示 */
-        #rematch-msg {
-            color: var(--accent-gold); font-size: 0.9rem; margin-bottom: 10px; height: 1.5em;
-            font-family: 'Noto Sans JP', sans-serif;
-        }
-        /* 日本語化に伴う文字サイズ調整 */
-        .game-title span { font-size: 0.9em; }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg-color: #0f172a;
+    --text-color: #e2e8f0;
+    --p1: #0ea5e9; /* 青 */
+    --p2: #f43f5e; /* 赤 */
+}
+
+body {
+    margin: 0; background: var(--bg-color); color: var(--text-color);
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    height: 100vh; overflow: hidden; touch-action: none;
+    display: flex; justify-content: center; align-items: center;
+}
+
+.screen {
+    position: absolute; width: 100%; height: 100%;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--bg-color);
+}
+.screen.active { display: flex; z-index: 10; }
+
+h1 { font-size: 2rem; margin-bottom: 20px; text-shadow: 0 0 10px rgba(255,255,255,0.5); text-align: center; }
+
+.btn {
+    width: 250px; padding: 15px; margin: 10px; font-size: 1.2rem;
+    background: rgba(255,255,255,0.1); border: 2px solid #fff; color: #fff;
+    border-radius: 30px; cursor: pointer; font-weight: bold;
+}
+.btn:active { background: #fff; color: #000; }
+.btn-host { border-color: var(--p1); color: var(--p1); }
+.btn-guest { border-color: var(--p2); color: var(--p2); }
+
+/* ゲーム画面 */
+#game-canvas {
+    background: #1e293b; box-shadow: 0 0 20px #000;
+    max-width: 100%; max-height: 100%;
+}
+
+.overlay-ui {
+    position: absolute; top:0; left:0; width:100%; height:100%;
+    pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
+}
+
+.hud {
+    padding: 10px; display: flex; justify-content: space-between;
+    font-size: 1.2rem; font-weight: bold; text-shadow: 1px 1px 0 #000;
+}
+
+.control-guide {
+    text-align: center; padding-bottom: 20px; opacity: 0.7; font-size: 0.9rem;
+    color: #ffd700;
+}
+
+/* ネットワークUI */
+.qr-box { background: #fff; padding: 10px; border-radius: 10px; margin: 10px; }
+.input-id { font-size: 1.2rem; padding: 10px; text-align: center; border-radius: 5px; border:none; margin: 10px; }
+#cam { width: 300px; display:none; border:2px solid #fff; }
+
+/* 結果 */
+#modal-result {
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.85); z-index: 100;
+    display: none; flex-direction: column; justify-content: center; align-items: center;
+}
+</style>
 </head>
 <body>
-    <div class="bg-grid"></div>
 
-    <div class="app-container">
-        <!-- タイトル画面 -->
-        <div id="screen-mode" class="screen active panel-glass">
-            <h1 class="game-title">スマッシュブレイカー</h1>
-            <div class="menu-grid">
-                <button class="btn" onclick="GameApp.start('normal')">ブロック崩し</button>
-                <button class="btn" onclick="GameApp.start('endless')">エンドレスブロック崩し</button>
-                <div class="spacer"></div>
-                <button class="btn btn-vs" onclick="GameApp.start('local-vs')">ローカル対戦 (2P)</button>
-                <button class="btn btn-net" onclick="Network.openMenu()">オンライン対戦</button>
-                <div class="spacer"></div>
-                <button class="btn btn-gold" onclick="GameApp.openEditor()">パドル工房 (作成)</button>
-                <button class="btn btn-sub" onclick="GameApp.openSettings()">プリセット選択</button>
-            </div>
-            <div class="controls-info">
-                [P1] 矢印 / WASD + Shift/Space &nbsp;|&nbsp; [P2] WASD + Shift
-            </div>
+<!-- タイトル -->
+<div id="screen-title" class="screen active">
+    <h1>スマッシュ<br>ブレイカー</h1>
+    <button class="btn" onclick="Game.initLocal()">ひとりで遊ぶ</button>
+    <button class="btn btn-host" onclick="Network.host()">部屋をつくる (ホスト)</button>
+    <button class="btn btn-guest" onclick="Network.guestUI()">部屋に入る (ゲスト)</button>
+</div>
+
+<!-- ホスト待機 -->
+<div id="screen-host" class="screen">
+    <h2>参加者待ち</h2>
+    <div id="qr-area" class="qr-box"></div>
+    <p>ID: <span id="host-id">...</span></p>
+    <button class="btn" onclick="location.reload()">キャンセル</button>
+</div>
+
+<!-- ゲスト接続 -->
+<div id="screen-guest" class="screen">
+    <div id="cam"></div>
+    <button class="btn btn-host" onclick="Network.scan()">QRを読み取る</button>
+    <input type="text" id="inp-id" class="input-id" placeholder="IDを入力">
+    <button class="btn btn-guest" onclick="Network.joinInput()">IDで参加</button>
+    <button class="btn" onclick="location.reload()">もどる</button>
+</div>
+
+<!-- ゲーム -->
+<div id="screen-game" class="screen">
+    <canvas id="cvs"></canvas>
+    <div class="overlay-ui">
+        <div class="hud">
+            <div id="score">スコア: 0</div>
+            <div id="role-disp">練習モード</div>
         </div>
-
-        <!-- オンラインメニュー -->
-<div id="screen-network" class="screen panel-glass">
-    <h2>NETWORK SYSTEM</h2>
-    
-    <!-- 初期メニュー -->
-    <div id="net-menu-init" class="menu-grid">
-        <button class="btn btn-net" onclick="Network.initHost()">ルーム作成 (HOST)</button>
-        <div class="divider">または</div>
-        
-        <!-- 追加: カメラ映像表示エリア -->
-        <div id="qr-reader"></div>
-
-        <!-- 変更: ID入力欄とカメラボタン -->
-        <div style="display:flex; gap:5px;">
-            <input type="text" id="net-room-id" class="room-input" placeholder="HOST ID">
-            <button class="btn btn-sub" onclick="Network.toggleScanner()" style="width:50px; padding:0;">📷</button>
+        <div class="control-guide">
+            ← 左右になぞって移動・タップでスマッシュ！ →
         </div>
-
-        <button class="btn btn-net" onclick="Network.joinRoom()">ルーム参加 (GUEST)</button>
-        <button class="btn btn-back" onclick="Network.closeMenu()">戻る</button>
-    </div>
-
-    <!-- ホスト待機画面 -->
-    <div id="net-menu-host" class="menu-grid" style="display:none; text-align:center;">
-        <p class="sys-msg">IDを共有、またはQRをスキャン</p>
-        
-        <!-- 追加: QRコード表示エリア -->
-        <div id="qrcode-display"></div>
-
-        <div id="host-id-display" class="id-box">生成中...</div>
-        <div class="net-status">対戦相手の接続を待機中...</div>
-        <button class="btn btn-back" onclick="location.reload()">キャンセル</button>
-    </div>
-
-    <!-- 接続中画面 -->
-    <div id="net-menu-connecting" class="menu-grid" style="display:none; text-align:center;">
-        <div class="net-status" style="color:#00f3ff;">接続を確立中...</div>
     </div>
 </div>
 
-        <!-- パドル工房 -->
-        <div id="screen-editor" class="screen panel-glass">
-            <h2>PADDLE FACTORY</h2>
-            <div class="editor-layout">
-                <div class="editor-container">
-                    <div id="pixel-grid"></div>
-                    <div id="color-palette"></div>
-                </div>
-                <div class="menu-grid editor-btns">
-                    <button class="btn btn-gold" onclick="GameApp.applyCustomPaddle()">装備してゲームへ</button>
-                    <div class="btn-row">
-                        <button class="btn btn-sub" onclick="GameApp.savePaddleWebP()">画像保存</button>
-                        <button class="btn btn-sub" onclick="document.getElementById('paddle-webp-input').click()">画像読込</button>
-                    </div>
-                    <div class="btn-row">
-                        <button class="btn btn-sub" onclick="GameApp.savePaddleJSON()">データ保存</button>
-                        <button class="btn btn-sub" onclick="document.getElementById('paddle-file-input').click()">データ読込</button>
-                    </div>
-                    <button class="btn btn-warn" onclick="GameApp.clearEditor()">全消去</button>
-                    <button class="btn btn-back" onclick="GameApp.closeEditor()">戻る</button>
-                </div>
-            </div>
-            <input type="file" id="paddle-file-input" accept=".json" style="display: none;">
-            <input type="file" id="paddle-webp-input" accept="image/webp,image/png" style="display: none;">
-        </div>
+<!-- 結果 -->
+<div id="modal-result">
+    <h1 id="res-msg">GAME OVER</h1>
+    <button class="btn" onclick="location.reload()">タイトルへ</button>
+</div>
 
-        <!-- 設定画面 -->
-        <div id="screen-settings" class="screen panel-glass">
-            <h2>SELECT MODULE</h2>
-            <div class="shape-grid" id="shape-selector"></div>
-            <button class="btn btn-back" onclick="GameApp.closeSettings()" style="margin-top:20px;">戻る</button>
-        </div>
+<script>
+/* Smash Breaker (Simple & JP) */
 
-        <!-- ゲーム画面 -->
-        <div id="screen-game" class="screen">
-            <div class="game-wrapper panel-glass">
-                <div class="hud">
-                    <div id="hud-left" class="hud-item">STAGE 1</div>
-                    <div id="hud-center" class="hud-item hud-vs" style="display:none;">VS MODE</div>
-                    <div id="hud-right" class="hud-item">SCORE: 0</div>
-                </div>
-                
-                <canvas id="game-canvas"></canvas>
-                
-                <button id="btn-mobile-charge" class="mobile-btn">チャージ</button>
-                
-                <div id="overlay" class="overlay">
-                    <h2 id="overlay-title">GAME OVER</h2>
-                    <div class="result-box" id="overlay-stats"></div>
-                    
-                    <div class="menu-grid" style="width: 280px;">
-                        <!-- 再戦用メッセージエリア -->
-                        <div id="rematch-msg"></div>
-                        
-                        <button id="btn-retry" class="btn" onclick="GameApp.retry()">リトライ</button>
-                        <button class="btn btn-net" onclick="GameApp.shareScore()">スコア共有 (X)</button>
-                        <button class="btn btn-back" onclick="GameApp.toTitle()">タイトルへ</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+const AudioSys = {
+    ctx: null,
+    init() { if(!this.ctx) this.ctx = new (window.AudioContext||window.webkitAudioContext)(); },
+    play(type) {
+        if(!this.ctx) return;
+        const o=this.ctx.createOscillator(); const g=this.ctx.createGain();
+        o.connect(g); g.connect(this.ctx.destination);
+        const t=this.ctx.currentTime;
+        if(type==='hit') {
+            o.type='square'; o.frequency.setValueAtTime(400,t);
+            g.gain.exponentialRampToValueAtTime(0.01,t+0.1);
+            o.start(); o.stop(t+0.1);
+        } else if(type==='smash') {
+            o.frequency.setValueAtTime(200,t); o.frequency.linearRampToValueAtTime(600,t+0.2);
+            g.gain.linearRampToValueAtTime(0,t+0.3);
+            o.start(); o.stop(t+0.3);
+        } else if(type==='over') {
+            o.type='sawtooth'; o.frequency.setValueAtTime(100,t);
+            g.gain.linearRampToValueAtTime(0,t+1);
+            o.start(); o.stop(t+1);
+        }
+    }
+};
 
-    <script src="audio.js"></script>
-    <script src="core.js"></script>
-    <script src="main.js"></script>
+const Network = {
+    peer:null, conn:null, isHost:false,
+    host() {
+        AudioSys.init();
+        document.querySelector('.active').classList.remove('active');
+        document.getElementById('screen-host').classList.add('active');
+        this.peer = new Peer();
+        this.peer.on('open', id=>{
+            document.getElementById('host-id').innerText=id;
+            this.isHost=true;
+            new QRCode(document.getElementById("qr-area"), {text:id, width:150, height:150});
+        });
+        this.peer.on('connection', c=>{
+            this.conn=c; this.setup();
+            Game.start(true);
+        });
+    },
+    guestUI() {
+        document.querySelector('.active').classList.remove('active');
+        document.getElementById('screen-guest').classList.add('active');
+    },
+    scan() {
+        AudioSys.init();
+        document.getElementById('cam').style.display='block';
+        const s = new Html5QrcodeScanner("cam",{fps:10,qrbox:200});
+        s.render(txt=>{
+            this.join(txt); s.clear(); document.getElementById('cam').style.display='none';
+        });
+    },
+    joinInput() { this.join(document.getElementById('inp-id').value); },
+    join(id) {
+        AudioSys.init();
+        this.peer=new Peer();
+        this.peer.on('open', ()=>{
+            this.conn=this.peer.connect(id);
+            this.isHost=false;
+            this.setup();
+            Game.start(false);
+        });
+    },
+    setup() {
+        this.conn.on('data', d=>Game.onData(d));
+        this.conn.on('close', ()=>alert("切断されました"));
+    },
+    send(d) { if(this.conn) this.conn.send(d); }
+};
+
+const Game = {
+    mode: 'local', // local, online
+    role: 'p1', // p1(Bottom), p2(Top)
+    
+    cvs: null, ctx: null, w:0, h:0,
+    loopId: null,
+    
+    // Game State
+    p1: { x:0.5, w:0.2, charge:0 },
+    p2: { x:0.5, w:0.2, charge:0 }, // CPU or Guest
+    ball: { x:0.5, y:0.5, vx:0.005, vy:0.01, speed:0.01, smash:false },
+    blocks: [],
+    score: 0,
+    
+    input: { x:0.5, tap:false },
+    
+    initLocal() {
+        AudioSys.init();
+        this.mode = 'local';
+        this.start(true); // Treat as P1
+    },
+    
+    start(isP1) {
+        document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));
+        document.getElementById('screen-game').classList.add('active');
+        
+        this.mode = (Network.conn) ? 'online' : 'local';
+        this.role = isP1 ? 'p1' : 'p2';
+        
+        document.getElementById('role-disp').innerText = 
+            (this.mode==='local') ? "練習モード" : (isP1?"ホスト(下)":"ゲスト(上)");
+        
+        this.cvs = document.getElementById('cvs');
+        this.ctx = this.cvs.getContext('2d');
+        this.resize();
+        window.onresize = ()=>this.resize();
+        
+        // Input
+        const evHandler = (e) => {
+            e.preventDefault();
+            const rect = this.cvs.getBoundingClientRect();
+            let cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+            this.input.x = cx / rect.width;
+            if(e.type === 'touchstart' || e.type === 'mousedown') this.input.tap = true;
+        };
+        this.cvs.addEventListener('mousemove', evHandler);
+        this.cvs.addEventListener('touchmove', evHandler);
+        this.cvs.addEventListener('mousedown', evHandler);
+        this.cvs.addEventListener('touchstart', evHandler);
+        
+        // Blocks Init
+        this.blocks = [];
+        for(let i=0; i<5; i++) {
+            for(let j=0; j<8; j++) {
+                this.blocks.push({ x:0.1 + j*0.1, y:0.3 + i*0.05, active:true });
+            }
+        }
+        
+        this.loop();
+    },
+    
+    resize() {
+        this.w = this.cvs.width = window.innerWidth;
+        this.h = this.cvs.height = window.innerHeight;
+    },
+    
+    loop() {
+        this.update();
+        this.draw();
+        this.input.tap = false; // Reset tap
+        this.loopId = requestAnimationFrame(()=>this.loop());
+    },
+    
+    update() {
+        // Player Control
+        if(this.role === 'p1') {
+            this.p1.x = this.input.x;
+            if(this.input.tap) this.p1.charge = 10;
+        } else {
+            this.p2.x = this.input.x; // P2 is flipped visually but logic uses 0-1
+            if(this.input.tap) this.p2.charge = 10;
+        }
+        
+        // Sync Input
+        if(this.mode === 'online') {
+            Network.send({ type:'input', x:this.input.x, tap:this.input.tap });
+        } else {
+            // CPU Logic (Local)
+            const diff = this.ball.x - this.p2.x;
+            this.p2.x += diff * 0.1;
+        }
+        
+        // P1(Host) calculates Physics
+        if(this.role === 'p1' || this.mode === 'local') {
+            
+            // Move Ball
+            let spd = this.ball.smash ? 0.025 : 0.012;
+            this.ball.x += this.ball.vx;
+            this.ball.y += this.ball.vy;
+            
+            // Wall
+            if(this.ball.x < 0 || this.ball.x > 1) this.ball.vx *= -1;
+            
+            // Paddle P1 (Bottom)
+            if(this.ball.y > 0.9 && this.ball.y < 0.95) {
+                if(Math.abs(this.ball.x - this.p1.x) < this.p1.w/2) {
+                    this.ball.vy = -Math.abs(this.ball.vy);
+                    // English(Spin) based on hit pos
+                    this.ball.vx = (this.ball.x - this.p1.x) * 0.05;
+                    // Smash
+                    if(this.p1.charge > 0) {
+                        this.ball.smash = true;
+                        this.p1.charge = 0;
+                        AudioSys.play('smash');
+                    } else {
+                        this.ball.smash = false;
+                        AudioSys.play('hit');
+                    }
+                }
+            }
+            
+            // Paddle P2 (Top)
+            if(this.ball.y < 0.1 && this.ball.y > 0.05) {
+                if(Math.abs(this.ball.x - this.p2.x) < this.p2.w/2) {
+                    this.ball.vy = Math.abs(this.ball.vy);
+                    this.ball.vx = (this.ball.x - this.p2.x) * 0.05;
+                    if(this.p2.charge > 0) { this.ball.smash = true; this.p2.charge = 0; AudioSys.play('smash'); }
+                    else { this.ball.smash = false; AudioSys.play('hit'); }
+                }
+            }
+            
+            // Blocks
+            this.blocks.forEach(b => {
+                if(b.active && Math.abs(this.ball.x - b.x)<0.05 && Math.abs(this.ball.y - b.y)<0.025) {
+                    b.active = false;
+                    this.ball.vy *= -1;
+                    this.score += 100;
+                    AudioSys.play('hit');
+                }
+            });
+            
+            // GameOver
+            if(this.ball.y > 1) this.gameOver("P2 / CPU の勝ち");
+            if(this.ball.y < 0) this.gameOver("あなた(P1) の勝ち");
+            
+            // Sync State
+            if(this.mode === 'online') {
+                Network.send({ type:'sync', ball:this.ball, p1:this.p1, p2:this.p2, blocks:this.blocks, score:this.score });
+            }
+        }
+    },
+    
+    draw() {
+        this.ctx.fillStyle = '#0f172a';
+        this.ctx.fillRect(0,0,this.w,this.h);
+        
+        // P1 (Bottom)
+        this.ctx.fillStyle = '#0ea5e9';
+        this.ctx.fillRect((this.p1.x - this.p1.w/2)*this.w, 0.9*this.h, this.p1.w*this.w, 15);
+        
+        // P2 (Top)
+        this.ctx.fillStyle = '#f43f5e';
+        this.ctx.fillRect((this.p2.x - this.p2.w/2)*this.w, 0.1*this.h, this.p2.w*this.w, 15);
+        
+        // Ball
+        this.ctx.fillStyle = this.ball.smash ? '#fbbf24' : '#fff';
+        this.ctx.beginPath();
+        this.ctx.arc(this.ball.x*this.w, this.ball.y*this.h, this.ball.smash?10:6, 0, Math.PI*2);
+        this.ctx.fill();
+        
+        // Blocks
+        this.ctx.fillStyle = '#38bdf8';
+        this.blocks.forEach(b => {
+            if(b.active) this.ctx.fillRect((b.x-0.04)*this.w, (b.y-0.02)*this.h, 0.08*this.w, 0.04*this.h);
+        });
+        
+        document.getElementById('score').innerText = "スコア: " + this.score;
+    },
+    
+    onData(d) {
+        if(d.type === 'input') {
+            if(this.role === 'p1') { // Host receives P2 input
+                this.p2.x = d.x;
+                if(d.tap) this.p2.charge = 10;
+            } 
+        } else if(d.type === 'sync') {
+            if(this.role === 'p2') { // Guest receives State
+                this.ball = d.ball;
+                this.p1 = d.p1; // Host pos
+                this.blocks = d.blocks;
+                this.score = d.score;
+                // Note: P2's own position is local-predicted, but synced loosely
+            }
+        } else if(d.type === 'over') {
+            this.gameOver(d.msg, true);
+        }
+    },
+    
+    gameOver(msg, remote=false) {
+        cancelAnimationFrame(this.loopId);
+        document.getElementById('modal-result').style.display = 'flex';
+        document.getElementById('res-msg').innerText = msg;
+        AudioSys.play('over');
+        if(!remote && this.mode === 'online') Network.send({ type:'over', msg:msg });
+    }
+};
+</script>
 </body>
 </html>

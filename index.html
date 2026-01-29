@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>スマッシュブレイカー (完全版)</title>
+    <title>スマッシュブレイカー (修正版)</title>
     
     <!-- 必要なライブラリ -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -333,6 +333,15 @@ const Editor = {
 const Network = {
     peer: null, conn: null, isHost: false, scanner: null,
     
+    // 【修正箇所】メニューを開く機能を追加
+    openMenu() {
+        document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
+        document.getElementById('screen-network').classList.add('active');
+        document.getElementById('net-select').style.display='flex';
+        document.getElementById('net-host').style.display='none';
+        document.getElementById('net-guest').style.display='none';
+    },
+
     initHost() {
         Sound.init();
         document.getElementById('net-select').style.display='none';
@@ -458,6 +467,11 @@ const Game = {
             const rect = this.canvas.getBoundingClientRect();
             this.touchX = e.clientX - rect.left;
         };
+        this.canvas.ontouchmove = (e) => {
+            e.preventDefault();
+            const rect = this.canvas.getBoundingClientRect();
+            this.touchX = e.touches[0].clientX - rect.left;
+        };
         
         this.state = 'playing';
         if(this.loopId) cancelAnimationFrame(this.loopId);
@@ -470,8 +484,7 @@ const Game = {
         this.score = 0;
         
         if(this.mode === 'online') {
-            // 対戦モード: 中央に障害物を配置しない（または共有）
-            // ここではシンプルにエアホッケー形式にするためブロックなし、または少数
+            // 対戦モード: 中央に障害物を配置しない
             return;
         }
 
@@ -529,7 +542,7 @@ const Game = {
         // 自機移動
         if(this.touchX !== null) {
             // スムーズ移動
-            this.p1.x += (this.touchX - this.p1.x) * 0.2;
+            this.p1.x += (this.touchX - this.p1.x) * 0.3;
         }
         // 画面端制限
         const hw = this.p1.w / 2;
@@ -595,6 +608,12 @@ const Game = {
         if(this.mode === 'online' && b.y < -20) {
             this.gameOver("あなたの勝ち！");
             Network.send({ type: 'over', win: false }); // 相手に負けを伝える
+        }
+        
+        // ローカルクリア判定
+        if(this.mode === 'local' && this.blocks.length === 0) {
+            this.setupStage(this.stage + 1);
+            this.resetBall();
         }
     },
     

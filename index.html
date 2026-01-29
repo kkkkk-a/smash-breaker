@@ -61,28 +61,44 @@
         </div>
 
         <!-- オンラインメニュー -->
-        <div id="screen-network" class="screen panel-glass">
-            <h2>NETWORK SYSTEM</h2>
-            
-            <div id="net-menu-init" class="menu-grid">
-                <button class="btn btn-net" onclick="Network.initHost()">ルーム作成 (ホスト)</button>
-                <div class="divider">または</div>
-                <input type="text" id="net-room-id" class="room-input" placeholder="ホストIDを入力">
-                <button class="btn btn-net" onclick="Network.joinRoom()">ルーム参加 (ゲスト)</button>
-                <button class="btn btn-back" onclick="Network.closeMenu()">戻る</button>
-            </div>
+<div id="screen-network" class="screen panel-glass">
+    <h2>NETWORK SYSTEM</h2>
+    
+    <!-- 初期メニュー -->
+    <div id="net-menu-init" class="menu-grid">
+        <button class="btn btn-net" onclick="Network.initHost()">ルーム作成 (HOST)</button>
+        <div class="divider">または</div>
+        
+        <!-- 追加: カメラ映像表示エリア -->
+        <div id="qr-reader"></div>
 
-            <div id="net-menu-host" class="menu-grid" style="display:none; text-align:center;">
-                <p class="sys-msg">以下のIDを対戦相手に伝えてください</p>
-                <div id="host-id-display" class="id-box">生成中...</div>
-                <div class="net-status">対戦相手の接続を待機中...</div>
-                <button class="btn btn-back" onclick="location.reload()">キャンセル</button>
-            </div>
-
-            <div id="net-menu-connecting" class="menu-grid" style="display:none; text-align:center;">
-                <div class="net-status" style="color:#00f3ff;">接続を確立中...</div>
-            </div>
+        <!-- 変更: ID入力欄とカメラボタン -->
+        <div style="display:flex; gap:5px;">
+            <input type="text" id="net-room-id" class="room-input" placeholder="HOST ID">
+            <button class="btn btn-sub" onclick="Network.toggleScanner()" style="width:50px; padding:0;">📷</button>
         </div>
+
+        <button class="btn btn-net" onclick="Network.joinRoom()">ルーム参加 (GUEST)</button>
+        <button class="btn btn-back" onclick="Network.closeMenu()">戻る</button>
+    </div>
+
+    <!-- ホスト待機画面 -->
+    <div id="net-menu-host" class="menu-grid" style="display:none; text-align:center;">
+        <p class="sys-msg">IDを共有、またはQRをスキャン</p>
+        
+        <!-- 追加: QRコード表示エリア -->
+        <div id="qrcode-display"></div>
+
+        <div id="host-id-display" class="id-box">生成中...</div>
+        <div class="net-status">対戦相手の接続を待機中...</div>
+        <button class="btn btn-back" onclick="location.reload()">キャンセル</button>
+    </div>
+
+    <!-- 接続中画面 -->
+    <div id="net-menu-connecting" class="menu-grid" style="display:none; text-align:center;">
+        <div class="net-status" style="color:#00f3ff;">接続を確立中...</div>
+    </div>
+</div>
 
         <!-- パドル工房 -->
         <div id="screen-editor" class="screen panel-glass">

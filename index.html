@@ -3,405 +3,693 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>スマッシュブレイカー (日本語版)</title>
+    <title>スマッシュブレイカー (完全版)</title>
+    
+    <!-- 必要なライブラリ -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap" rel="stylesheet">
+
 <style>
 :root {
-    --bg-color: #0f172a;
-    --text-color: #e2e8f0;
-    --p1: #0ea5e9; /* 青 */
-    --p2: #f43f5e; /* 赤 */
+    --bg-color: #eef2f5;
+    --text-color: #2c3e50;
+    --primary: #3498db; /* 青 */
+    --accent: #e74c3c;  /* 赤 */
+    --success: #2ecc71; /* 緑 */
+    --warning: #f1c40f; /* 黄 */
+    --canvas-bg: #1a1a2e;
 }
 
 body {
     margin: 0; background: var(--bg-color); color: var(--text-color);
     font-family: 'M PLUS Rounded 1c', sans-serif;
-    height: 100vh; overflow: hidden; touch-action: none;
+    height: 100vh; overflow: hidden; touch-action: none; /* スクロール禁止 */
     display: flex; justify-content: center; align-items: center;
 }
 
+/* 画面管理 */
 .screen {
     position: absolute; width: 100%; height: 100%;
     display: none; flex-direction: column; align-items: center; justify-content: center;
-    background: var(--bg-color);
+    background: var(--bg-color); z-index: 1;
 }
 .screen.active { display: flex; z-index: 10; }
 
-h1 { font-size: 2rem; margin-bottom: 20px; text-shadow: 0 0 10px rgba(255,255,255,0.5); text-align: center; }
+/* UIパーツ */
+h1 { font-size: 2.5rem; margin-bottom: 10px; text-align: center; color: #34495e; text-shadow: 2px 2px 0px rgba(0,0,0,0.1); }
+h2 { font-size: 1.5rem; margin-bottom: 20px; }
 
 .btn {
-    width: 250px; padding: 15px; margin: 10px; font-size: 1.2rem;
-    background: rgba(255,255,255,0.1); border: 2px solid #fff; color: #fff;
-    border-radius: 30px; cursor: pointer; font-weight: bold;
+    width: 80%; max-width: 320px; padding: 16px; margin: 8px;
+    border: none; border-radius: 50px;
+    font-size: 1.2rem; font-weight: bold; cursor: pointer;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.1); transition: transform 0.1s;
+    background: #fff; color: #555; border: 2px solid #ddd;
 }
-.btn:active { background: #fff; color: #000; }
-.btn-host { border-color: var(--p1); color: var(--p1); }
-.btn-guest { border-color: var(--p2); color: var(--p2); }
+.btn:active { transform: translateY(4px); box-shadow: none; }
+.btn-primary { background: var(--primary); color: #fff; border: none; box-shadow: 0 4px 0 #2980b9; }
+.btn-accent { background: var(--accent); color: #fff; border: none; box-shadow: 0 4px 0 #c0392b; }
+.btn-success { background: var(--success); color: #fff; border: none; box-shadow: 0 4px 0 #27ae60; }
 
-/* ゲーム画面 */
-#game-canvas {
-    background: #1e293b; box-shadow: 0 0 20px #000;
-    max-width: 100%; max-height: 100%;
-}
-
-.overlay-ui {
-    position: absolute; top:0; left:0; width:100%; height:100%;
-    pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
+.input-box {
+    font-size: 1.2rem; padding: 12px; width: 70%; text-align: center;
+    border: 2px solid #ccc; border-radius: 8px; margin: 10px 0;
 }
 
+/* ネットワーク画面 */
+#qr-display { background: #fff; padding: 15px; border-radius: 10px; margin: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+#camera-wrapper { width: 90%; max-width: 300px; margin: 10px; border: 4px solid #333; border-radius: 8px; overflow: hidden; display: none; }
+
+/* ゲームキャンバス */
+#game-container {
+    position: relative; width: 100%; height: 100%; max-width: 600px;
+    background: #000; box-shadow: 0 0 20px rgba(0,0,0,0.3);
+}
+canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+/* HUD (スコアなど) */
 .hud {
-    padding: 10px; display: flex; justify-content: space-between;
-    font-size: 1.2rem; font-weight: bold; text-shadow: 1px 1px 0 #000;
+    position: absolute; top: 10px; left: 0; width: 100%;
+    display: flex; justify-content: space-between; padding: 0 20px; box-sizing: border-box;
+    pointer-events: none; color: #fff; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    z-index: 5; font-size: 1.2rem;
 }
 
-.control-guide {
-    text-align: center; padding-bottom: 20px; opacity: 0.7; font-size: 0.9rem;
-    color: #ffd700;
+/* エディタ画面 */
+.editor-grid {
+    display: grid; grid-template-columns: repeat(16, 1fr);
+    width: 320px; height: 320px; background: #333; border: 4px solid #555;
+    margin-bottom: 20px; touch-action: none;
+}
+.pixel { border: 1px solid rgba(255,255,255,0.05); background: transparent; }
+.palette { display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; width: 320px; }
+.color-swatch { width: 35px; height: 35px; border-radius: 50%; border: 2px solid #fff; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+.color-swatch.active { transform: scale(1.2); border-color: #333; }
+.eraser { background: 
+    repeating-linear-gradient(45deg, #ccc, #ccc 5px, #fff 5px, #fff 10px); 
 }
 
-/* ネットワークUI */
-.qr-box { background: #fff; padding: 10px; border-radius: 10px; margin: 10px; }
-.input-id { font-size: 1.2rem; padding: 10px; text-align: center; border-radius: 5px; border:none; margin: 10px; }
-#cam { width: 300px; display:none; border:2px solid #fff; }
-
-/* 結果 */
-#modal-result {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.85); z-index: 100;
+/* モーダル */
+.modal {
+    position: absolute; top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.85); z-index: 20;
     display: none; flex-direction: column; justify-content: center; align-items: center;
+    color: #fff;
 }
+.modal h2 { font-size: 3rem; margin-bottom: 10px; text-shadow: 0 0 10px var(--warning); }
+.score-result { font-size: 1.5rem; margin-bottom: 30px; font-family: monospace; }
+
 </style>
 </head>
 <body>
 
-<!-- タイトル -->
+<!-- 1. タイトル画面 -->
 <div id="screen-title" class="screen active">
     <h1>スマッシュ<br>ブレイカー</h1>
-    <button class="btn" onclick="Game.initLocal()">ひとりで遊ぶ</button>
-    <button class="btn btn-host" onclick="Network.host()">部屋をつくる (ホスト)</button>
-    <button class="btn btn-guest" onclick="Network.guestUI()">部屋に入る (ゲスト)</button>
+    <div style="font-size:0.9rem; color:#888; margin-bottom:20px;">直感操作ブロック崩し</div>
+    
+    <button class="btn btn-primary" onclick="Game.startLocal()">ひとりで遊ぶ</button>
+    <button class="btn btn-accent" onclick="Network.openMenu()">ふたりで対戦 (通信)</button>
+    <button class="btn btn-success" onclick="Editor.open()">機体をつくる</button>
 </div>
 
-<!-- ホスト待機 -->
-<div id="screen-host" class="screen">
-    <h2>参加者待ち</h2>
-    <div id="qr-area" class="qr-box"></div>
-    <p>ID: <span id="host-id">...</span></p>
-    <button class="btn" onclick="location.reload()">キャンセル</button>
+<!-- 2. ネットワークメニュー -->
+<div id="screen-network" class="screen">
+    <h2>通信対戦</h2>
+    
+    <div id="net-select" style="width:100%; display:flex; flex-direction:column; align-items:center;">
+        <button class="btn btn-primary" onclick="Network.initHost()">部屋をつくる (ホスト)</button>
+        <div style="margin:10px;">または</div>
+        <button class="btn btn-accent" onclick="Network.showGuest()">部屋に入る (ゲスト)</button>
+        <button class="btn" onclick="location.reload()" style="margin-top:20px;">もどる</button>
+    </div>
+
+    <!-- ホスト画面 -->
+    <div id="net-host" style="display:none; flex-direction:column; align-items:center; width:100%;">
+        <p>このQRコードを相手に見せてください</p>
+        <div id="qr-display"></div>
+        <div style="margin-bottom:20px;">ID: <span id="host-id-text" style="font-weight:bold;">生成中...</span></div>
+        <div style="color:var(--accent); font-weight:bold; animation:blink 1s infinite;">相手を待っています...</div>
+        <button class="btn" onclick="location.reload()" style="margin-top:20px;">キャンセル</button>
+    </div>
+
+    <!-- ゲスト画面 -->
+    <div id="net-guest" style="display:none; flex-direction:column; align-items:center; width:100%;">
+        <div id="camera-wrapper"></div>
+        <button class="btn btn-primary" onclick="Network.startCamera()">📷 QRを読み取る</button>
+        <div style="margin:10px;">または</div>
+        <input type="text" id="input-id" class="input-box" placeholder="招待コードを入力">
+        <button class="btn btn-accent" onclick="Network.joinByInput()">コードで参加</button>
+        <button class="btn" onclick="location.reload()" style="margin-top:20px;">もどる</button>
+    </div>
 </div>
 
-<!-- ゲスト接続 -->
-<div id="screen-guest" class="screen">
-    <div id="cam"></div>
-    <button class="btn btn-host" onclick="Network.scan()">QRを読み取る</button>
-    <input type="text" id="inp-id" class="input-id" placeholder="IDを入力">
-    <button class="btn btn-guest" onclick="Network.joinInput()">IDで参加</button>
-    <button class="btn" onclick="location.reload()">もどる</button>
+<!-- 3. エディタ画面 -->
+<div id="screen-editor" class="screen">
+    <h2>パドル工房</h2>
+    <div id="editor-grid" class="editor-grid"></div>
+    <div id="palette" class="palette"></div>
+    <div style="display:flex; gap:10px; width:90%; justify-content:center;">
+        <button class="btn btn-primary" onclick="Editor.saveAndExit()">保存して戻る</button>
+        <button class="btn" onclick="Editor.clear()">クリア</button>
+    </div>
+    <button class="btn" style="margin-top:10px; background:transparent; border:none;" onclick="Editor.close()">キャンセル</button>
 </div>
 
-<!-- ゲーム -->
-<div id="screen-game" class="screen">
-    <canvas id="cvs"></canvas>
-    <div class="overlay-ui">
+<!-- 4. ゲーム画面 -->
+<div id="screen-game" class="screen" style="background:#000;">
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
         <div class="hud">
-            <div id="score">スコア: 0</div>
-            <div id="role-disp">練習モード</div>
+            <div id="hud-left">STAGE 1</div>
+            <div id="hud-right">SCORE: 0</div>
         </div>
-        <div class="control-guide">
-            ← 左右になぞって移動・タップでスマッシュ！ →
+        
+        <!-- 結果モーダル -->
+        <div id="result-modal" class="modal">
+            <h2 id="result-title">GAME OVER</h2>
+            <div id="result-score" class="score-result">SCORE: 1000</div>
+            <button class="btn btn-primary" onclick="Game.retry()">もう一度</button>
+            <button class="btn" onclick="location.reload()">タイトルへ</button>
+        </div>
+        
+        <!-- 待機オーバーレイ -->
+        <div id="wait-overlay" class="modal" style="background:rgba(0,0,0,0.5);">
+            <h2 style="font-size:1.5rem;">相手を待っています...</h2>
         </div>
     </div>
 </div>
 
-<!-- 結果 -->
-<div id="modal-result">
-    <h1 id="res-msg">GAME OVER</h1>
-    <button class="btn" onclick="location.reload()">タイトルへ</button>
-</div>
+<style>
+@keyframes blink { 50% { opacity: 0.5; } }
+</style>
 
 <script>
-/* Smash Breaker (Simple & JP) */
+/**
+ * SMASH BREAKER - COMPLETE EDITION
+ * 日本語化・操作性改善・QR対応
+ */
 
-const AudioSys = {
+// --- 音声管理 (シンプル版) ---
+const Sound = {
     ctx: null,
     init() { if(!this.ctx) this.ctx = new (window.AudioContext||window.webkitAudioContext)(); },
     play(type) {
         if(!this.ctx) return;
-        const o=this.ctx.createOscillator(); const g=this.ctx.createGain();
+        const t = this.ctx.currentTime;
+        const o = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
         o.connect(g); g.connect(this.ctx.destination);
-        const t=this.ctx.currentTime;
-        if(type==='hit') {
-            o.type='square'; o.frequency.setValueAtTime(400,t);
-            g.gain.exponentialRampToValueAtTime(0.01,t+0.1);
+
+        if(type === 'hit') { // ボールヒット
+            o.type = 'square'; o.frequency.setValueAtTime(400, t);
+            g.gain.exponentialRampToValueAtTime(0.01, t+0.1);
             o.start(); o.stop(t+0.1);
-        } else if(type==='smash') {
-            o.frequency.setValueAtTime(200,t); o.frequency.linearRampToValueAtTime(600,t+0.2);
-            g.gain.linearRampToValueAtTime(0,t+0.3);
-            o.start(); o.stop(t+0.3);
-        } else if(type==='over') {
-            o.type='sawtooth'; o.frequency.setValueAtTime(100,t);
-            g.gain.linearRampToValueAtTime(0,t+1);
-            o.start(); o.stop(t+1);
+        } else if(type === 'break') { // ブロック破壊
+            o.type = 'sawtooth'; o.frequency.setValueAtTime(200, t);
+            o.frequency.linearRampToValueAtTime(50, t+0.2);
+            g.gain.exponentialRampToValueAtTime(0.01, t+0.2);
+            o.start(); o.stop(t+0.2);
+        } else if(type === 'paddle') { // パドル反射
+            o.type = 'sine'; o.frequency.setValueAtTime(800, t);
+            g.gain.exponentialRampToValueAtTime(0.01, t+0.1);
+            o.start(); o.stop(t+0.1);
+        } else if(type === 'win') { // 勝利
+            o.type = 'triangle';
+            o.frequency.setValueAtTime(523, t); o.frequency.setValueAtTime(1046, t+0.2);
+            g.gain.linearRampToValueAtTime(0, t+0.5);
+            o.start(); o.stop(t+0.5);
         }
     }
 };
 
-const Network = {
-    peer:null, conn:null, isHost:false,
-    host() {
-        AudioSys.init();
-        document.querySelector('.active').classList.remove('active');
-        document.getElementById('screen-host').classList.add('active');
-        this.peer = new Peer();
-        this.peer.on('open', id=>{
-            document.getElementById('host-id').innerText=id;
-            this.isHost=true;
-            new QRCode(document.getElementById("qr-area"), {text:id, width:150, height:150});
-        });
-        this.peer.on('connection', c=>{
-            this.conn=c; this.setup();
-            Game.start(true);
-        });
-    },
-    guestUI() {
-        document.querySelector('.active').classList.remove('active');
-        document.getElementById('screen-guest').classList.add('active');
-    },
-    scan() {
-        AudioSys.init();
-        document.getElementById('cam').style.display='block';
-        const s = new Html5QrcodeScanner("cam",{fps:10,qrbox:200});
-        s.render(txt=>{
-            this.join(txt); s.clear(); document.getElementById('cam').style.display='none';
-        });
-    },
-    joinInput() { this.join(document.getElementById('inp-id').value); },
-    join(id) {
-        AudioSys.init();
-        this.peer=new Peer();
-        this.peer.on('open', ()=>{
-            this.conn=this.peer.connect(id);
-            this.isHost=false;
-            this.setup();
-            Game.start(false);
-        });
-    },
-    setup() {
-        this.conn.on('data', d=>Game.onData(d));
-        this.conn.on('close', ()=>alert("切断されました"));
-    },
-    send(d) { if(this.conn) this.conn.send(d); }
-};
-
-const Game = {
-    mode: 'local', // local, online
-    role: 'p1', // p1(Bottom), p2(Top)
+// --- パドルデータ (エディタ用) ---
+const PaddleData = {
+    pixels: new Array(16*16).fill(null), // 16x16 grid
+    colors: ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#ecf0f1', '#95a5a6', '#34495e', '#000000'],
+    customized: false,
     
-    cvs: null, ctx: null, w:0, h:0,
-    loopId: null,
-    
-    // Game State
-    p1: { x:0.5, w:0.2, charge:0 },
-    p2: { x:0.5, w:0.2, charge:0 }, // CPU or Guest
-    ball: { x:0.5, y:0.5, vx:0.005, vy:0.01, speed:0.01, smash:false },
-    blocks: [],
-    score: 0,
-    
-    input: { x:0.5, tap:false },
-    
-    initLocal() {
-        AudioSys.init();
-        this.mode = 'local';
-        this.start(true); // Treat as P1
-    },
-    
-    start(isP1) {
-        document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));
-        document.getElementById('screen-game').classList.add('active');
-        
-        this.mode = (Network.conn) ? 'online' : 'local';
-        this.role = isP1 ? 'p1' : 'p2';
-        
-        document.getElementById('role-disp').innerText = 
-            (this.mode==='local') ? "練習モード" : (isP1?"ホスト(下)":"ゲスト(上)");
-        
-        this.cvs = document.getElementById('cvs');
-        this.ctx = this.cvs.getContext('2d');
-        this.resize();
-        window.onresize = ()=>this.resize();
-        
-        // Input
-        const evHandler = (e) => {
-            e.preventDefault();
-            const rect = this.cvs.getBoundingClientRect();
-            let cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-            this.input.x = cx / rect.width;
-            if(e.type === 'touchstart' || e.type === 'mousedown') this.input.tap = true;
-        };
-        this.cvs.addEventListener('mousemove', evHandler);
-        this.cvs.addEventListener('touchmove', evHandler);
-        this.cvs.addEventListener('mousedown', evHandler);
-        this.cvs.addEventListener('touchstart', evHandler);
-        
-        // Blocks Init
-        this.blocks = [];
-        for(let i=0; i<5; i++) {
-            for(let j=0; j<8; j++) {
-                this.blocks.push({ x:0.1 + j*0.1, y:0.3 + i*0.05, active:true });
+    renderToCanvas(ctx, x, y, w, h) {
+        if(!this.customized) {
+            // デフォルトデザイン (スタイリッシュなバー)
+            ctx.fillStyle = '#3498db';
+            ctx.beginPath();
+            ctx.roundRect(x - w/2, y - h/2, w, h, 10);
+            ctx.fill();
+            // 光沢
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.fillRect(x - w/2 + 5, y - h/2 + 2, w - 10, h/2 - 2);
+        } else {
+            // カスタムドット絵
+            const size = w / 16;
+            const startX = x - w/2;
+            const startY = y - w/2; // 正方形として描画
+            
+            for(let i=0; i<256; i++) {
+                if(this.pixels[i]) {
+                    ctx.fillStyle = this.pixels[i];
+                    const px = i % 16;
+                    const py = Math.floor(i / 16);
+                    ctx.fillRect(startX + px*size, startY + py*size, size, size);
+                }
             }
         }
+    }
+};
+
+// --- エディタ機能 ---
+const Editor = {
+    selectedColor: '#3498db',
+    
+    open() {
+        document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
+        document.getElementById('screen-editor').classList.add('active');
+        this.initGrid();
+        this.initPalette();
+    },
+    
+    initGrid() {
+        const grid = document.getElementById('editor-grid');
+        grid.innerHTML = '';
+        PaddleData.pixels.forEach((col, i) => {
+            const div = document.createElement('div');
+            div.className = 'pixel';
+            if(col) div.style.backgroundColor = col;
+            
+            // タッチ/マウス描画
+            const paint = () => { div.style.backgroundColor = this.selectedColor; PaddleData.pixels[i] = this.selectedColor; };
+            div.onpointerdown = (e) => { e.releasePointerCapture(e.pointerId); paint(); };
+            div.onpointerenter = (e) => { if(e.buttons===1) paint(); };
+            
+            grid.appendChild(div);
+        });
+    },
+    
+    initPalette() {
+        const pal = document.getElementById('palette');
+        pal.innerHTML = '';
+        // カラー
+        PaddleData.colors.forEach(c => {
+            const d = document.createElement('div');
+            d.className = 'color-swatch';
+            d.style.backgroundColor = c;
+            d.onclick = () => { this.setColor(c, d); };
+            if(c === this.selectedColor) d.classList.add('active');
+            pal.appendChild(d);
+        });
+        // 消しゴム
+        const e = document.createElement('div');
+        e.className = 'color-swatch eraser';
+        e.onclick = () => { this.setColor(null, e); };
+        pal.appendChild(e);
+    },
+    
+    setColor(c, el) {
+        this.selectedColor = c;
+        document.querySelectorAll('.color-swatch').forEach(x => x.classList.remove('active'));
+        el.classList.add('active');
+    },
+    
+    clear() {
+        PaddleData.pixels.fill(null);
+        this.initGrid();
+    },
+    
+    saveAndExit() {
+        PaddleData.customized = PaddleData.pixels.some(c => c !== null);
+        document.getElementById('screen-editor').classList.remove('active');
+        document.getElementById('screen-title').classList.add('active');
+    },
+    
+    close() {
+        document.getElementById('screen-editor').classList.remove('active');
+        document.getElementById('screen-title').classList.add('active');
+    }
+};
+
+// --- ネットワーク機能 ---
+const Network = {
+    peer: null, conn: null, isHost: false, scanner: null,
+    
+    initHost() {
+        Sound.init();
+        document.getElementById('net-select').style.display='none';
+        document.getElementById('net-host').style.display='flex';
         
+        this.peer = new Peer();
+        this.peer.on('open', id => {
+            document.getElementById('host-id-text').innerText = id;
+            this.isHost = true;
+            document.getElementById('qr-display').innerHTML = "";
+            new QRCode(document.getElementById("qr-display"), { text: id, width: 160, height: 160 });
+        });
+        
+        this.peer.on('connection', c => {
+            this.conn = c;
+            this.setupConn();
+            Game.startOnline(true);
+        });
+    },
+    
+    showGuest() {
+        document.getElementById('net-select').style.display='none';
+        document.getElementById('net-guest').style.display='flex';
+    },
+    
+    startCamera() {
+        Sound.init();
+        const wrap = document.getElementById('camera-wrapper');
+        wrap.style.display = 'block';
+        this.scanner = new Html5QrcodeScanner("camera-wrapper", { fps: 10, qrbox: 200 });
+        this.scanner.render((decoded) => {
+            this.join(decoded);
+            this.scanner.clear();
+            wrap.style.display = 'none';
+        });
+    },
+    
+    joinByInput() {
+        const id = document.getElementById('input-id').value;
+        if(id) this.join(id);
+    },
+    
+    join(id) {
+        Sound.init();
+        this.peer = new Peer();
+        this.peer.on('open', () => {
+            this.conn = this.peer.connect(id);
+            this.isHost = false;
+            this.setupConn();
+            Game.startOnline(false);
+        });
+        this.peer.on('error', () => alert("接続できませんでした"));
+    },
+    
+    setupConn() {
+        this.conn.on('data', d => Game.onNetworkData(d));
+        this.conn.on('close', () => { alert("通信切断"); location.reload(); });
+        this.conn.on('open', () => console.log("Connected"));
+    },
+    
+    send(d) { if(this.conn && this.conn.open) this.conn.send(d); }
+};
+
+// --- ゲーム本体 ---
+const Game = {
+    canvas: null, ctx: null, loopId: null,
+    mode: 'local', // local, online
+    role: 'p1', // p1(host), p2(guest)
+    state: 'title', // playing, over
+    
+    width: 600, height: 800,
+    
+    // オブジェクト
+    p1: { x: 300, y: 750, w: 100, h: 20 },
+    p2: { x: 300, y: 50, w: 100, h: 20 }, // 対戦相手
+    ball: { x: 300, y: 400, r: 8, vx: 0, vy: 0, speed: 7 },
+    blocks: [],
+    
+    score: 0, stage: 1,
+    
+    // 入力
+    touchX: null,
+    
+    startLocal() {
+        Sound.init();
+        this.mode = 'local';
+        this.role = 'p1';
+        this.initGame();
+    },
+    
+    startOnline(isHost) {
+        this.mode = 'online';
+        this.role = isHost ? 'p1' : 'p2';
+        this.initGame();
+    },
+    
+    initGame() {
+        document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
+        document.getElementById('screen-game').classList.add('active');
+        document.getElementById('result-modal').style.display = 'none';
+        document.getElementById('wait-overlay').style.display = 'none';
+        
+        this.canvas = document.getElementById('game-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        
+        // サイズ調整
+        const rect = document.getElementById('game-container').getBoundingClientRect();
+        this.canvas.width = this.width = rect.width;
+        this.canvas.height = this.height = rect.height;
+        
+        // オブジェクト初期配置
+        this.p1.y = this.height - 50;
+        this.p1.x = this.width / 2;
+        this.p2.y = 50;
+        this.p2.x = this.width / 2;
+        
+        this.setupStage(1);
+        this.resetBall();
+        
+        // 入力イベント
+        this.canvas.onpointermove = (e) => {
+            e.preventDefault();
+            const rect = this.canvas.getBoundingClientRect();
+            this.touchX = e.clientX - rect.left;
+        };
+        
+        this.state = 'playing';
+        if(this.loopId) cancelAnimationFrame(this.loopId);
         this.loop();
     },
     
-    resize() {
-        this.w = this.cvs.width = window.innerWidth;
-        this.h = this.cvs.height = window.innerHeight;
+    setupStage(lvl) {
+        this.stage = lvl;
+        this.blocks = [];
+        this.score = 0;
+        
+        if(this.mode === 'online') {
+            // 対戦モード: 中央に障害物を配置しない（または共有）
+            // ここではシンプルにエアホッケー形式にするためブロックなし、または少数
+            return;
+        }
+
+        // 通常モード: ブロック配置
+        const rows = 5 + lvl;
+        const cols = 7;
+        const bw = (this.width - 40) / cols;
+        const bh = 25;
+        
+        for(let r=0; r<rows; r++) {
+            for(let c=0; c<cols; c++) {
+                if(Math.random() > 0.1) {
+                    this.blocks.push({
+                        x: 20 + c * bw,
+                        y: 80 + r * bh,
+                        w: bw - 4,
+                        h: bh - 4,
+                        hp: 1,
+                        color: `hsl(${r * 40}, 70%, 60%)`
+                    });
+                }
+            }
+        }
+    },
+    
+    resetBall() {
+        this.ball.x = this.width / 2;
+        this.ball.y = this.height / 2;
+        this.ball.speed = 6 + (this.stage * 0.5);
+        // ランダムな角度で発射
+        const angle = Math.random() * Math.PI / 2 + (Math.PI / 4);
+        this.ball.vx = Math.cos(angle) * this.ball.speed * (Math.random()>0.5?1:-1);
+        this.ball.vy = Math.sin(angle) * this.ball.speed * (Math.random()>0.5?1:-1);
+        
+        // オンラインホストのみがボール計算を行う
+        if(this.mode === 'online' && this.role === 'p2') {
+            this.ball.vx = 0; this.ball.vy = 0;
+        }
     },
     
     loop() {
+        if(this.state !== 'playing') return;
+        
         this.update();
         this.draw();
-        this.input.tap = false; // Reset tap
-        this.loopId = requestAnimationFrame(()=>this.loop());
+        
+        if(this.mode === 'online') {
+            this.syncNetwork();
+        }
+        
+        this.loopId = requestAnimationFrame(() => this.loop());
     },
     
     update() {
-        // Player Control
-        if(this.role === 'p1') {
-            this.p1.x = this.input.x;
-            if(this.input.tap) this.p1.charge = 10;
-        } else {
-            this.p2.x = this.input.x; // P2 is flipped visually but logic uses 0-1
-            if(this.input.tap) this.p2.charge = 10;
+        // 自機移動
+        if(this.touchX !== null) {
+            // スムーズ移動
+            this.p1.x += (this.touchX - this.p1.x) * 0.2;
+        }
+        // 画面端制限
+        const hw = this.p1.w / 2;
+        if(this.p1.x < hw) this.p1.x = hw;
+        if(this.p1.x > this.width - hw) this.p1.x = this.width - hw;
+
+        // ボール計算 (ローカル または オンラインホスト)
+        if(this.mode === 'local' || (this.mode === 'online' && this.role === 'p1')) {
+            this.updatePhysics();
+        }
+    },
+    
+    updatePhysics() {
+        const b = this.ball;
+        b.x += b.vx;
+        b.y += b.vy;
+        
+        // 壁反射
+        if(b.x < b.r || b.x > this.width - b.r) b.vx *= -1;
+        
+        // P1パドル反射
+        if(this.hitRect(b, this.p1)) {
+            b.vy = -Math.abs(b.vy);
+            // 摩擦を加える（横移動の影響）
+            b.vx += (b.x - this.p1.x) * 0.1;
+            Sound.play('paddle');
         }
         
-        // Sync Input
+        // P2/CPUパドル反射
         if(this.mode === 'online') {
-            Network.send({ type:'input', x:this.input.x, tap:this.input.tap });
+            if(this.hitRect(b, this.p2)) {
+                b.vy = Math.abs(b.vy);
+                b.vx += (b.x - this.p2.x) * 0.1;
+                Sound.play('paddle');
+            }
         } else {
-            // CPU Logic (Local)
-            const diff = this.ball.x - this.p2.x;
-            this.p2.x += diff * 0.1;
+            // ローカル上壁
+            if(b.y < b.r) b.vy *= -1;
         }
         
-        // P1(Host) calculates Physics
-        if(this.role === 'p1' || this.mode === 'local') {
-            
-            // Move Ball
-            let spd = this.ball.smash ? 0.025 : 0.012;
-            this.ball.x += this.ball.vx;
-            this.ball.y += this.ball.vy;
-            
-            // Wall
-            if(this.ball.x < 0 || this.ball.x > 1) this.ball.vx *= -1;
-            
-            // Paddle P1 (Bottom)
-            if(this.ball.y > 0.9 && this.ball.y < 0.95) {
-                if(Math.abs(this.ball.x - this.p1.x) < this.p1.w/2) {
-                    this.ball.vy = -Math.abs(this.ball.vy);
-                    // English(Spin) based on hit pos
-                    this.ball.vx = (this.ball.x - this.p1.x) * 0.05;
-                    // Smash
-                    if(this.p1.charge > 0) {
-                        this.ball.smash = true;
-                        this.p1.charge = 0;
-                        AudioSys.play('smash');
-                    } else {
-                        this.ball.smash = false;
-                        AudioSys.play('hit');
-                    }
-                }
-            }
-            
-            // Paddle P2 (Top)
-            if(this.ball.y < 0.1 && this.ball.y > 0.05) {
-                if(Math.abs(this.ball.x - this.p2.x) < this.p2.w/2) {
-                    this.ball.vy = Math.abs(this.ball.vy);
-                    this.ball.vx = (this.ball.x - this.p2.x) * 0.05;
-                    if(this.p2.charge > 0) { this.ball.smash = true; this.p2.charge = 0; AudioSys.play('smash'); }
-                    else { this.ball.smash = false; AudioSys.play('hit'); }
-                }
-            }
-            
-            // Blocks
-            this.blocks.forEach(b => {
-                if(b.active && Math.abs(this.ball.x - b.x)<0.05 && Math.abs(this.ball.y - b.y)<0.025) {
-                    b.active = false;
-                    this.ball.vy *= -1;
-                    this.score += 100;
-                    AudioSys.play('hit');
-                }
-            });
-            
-            // GameOver
-            if(this.ball.y > 1) this.gameOver("P2 / CPU の勝ち");
-            if(this.ball.y < 0) this.gameOver("あなた(P1) の勝ち");
-            
-            // Sync State
-            if(this.mode === 'online') {
-                Network.send({ type:'sync', ball:this.ball, p1:this.p1, p2:this.p2, blocks:this.blocks, score:this.score });
+        // ブロック衝突
+        for(let i=this.blocks.length-1; i>=0; i--) {
+            const blk = this.blocks[i];
+            if(b.x > blk.x && b.x < blk.x + blk.w && b.y > blk.y && b.y < blk.y + blk.h) {
+                b.vy *= -1;
+                this.blocks.splice(i, 1);
+                this.score += 100;
+                Sound.play('break');
+                break;
             }
         }
+        
+        // 落下判定
+        if(b.y > this.height + 20) {
+            if(this.mode === 'online') {
+                this.gameOver("あなたの負け...");
+                Network.send({ type: 'over', win: true }); // 相手に勝ちを伝える
+            } else {
+                this.gameOver("GAME OVER");
+            }
+        }
+        // 天井判定 (オンラインのみ)
+        if(this.mode === 'online' && b.y < -20) {
+            this.gameOver("あなたの勝ち！");
+            Network.send({ type: 'over', win: false }); // 相手に負けを伝える
+        }
+    },
+    
+    hitRect(b, p) {
+        return (b.x > p.x - p.w/2 && b.x < p.x + p.w/2 && 
+                b.y > p.y - p.h/2 && b.y < p.y + p.h/2);
     },
     
     draw() {
-        this.ctx.fillStyle = '#0f172a';
-        this.ctx.fillRect(0,0,this.w,this.h);
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.width, this.height);
         
-        // P1 (Bottom)
-        this.ctx.fillStyle = '#0ea5e9';
-        this.ctx.fillRect((this.p1.x - this.p1.w/2)*this.w, 0.9*this.h, this.p1.w*this.w, 15);
-        
-        // P2 (Top)
-        this.ctx.fillStyle = '#f43f5e';
-        this.ctx.fillRect((this.p2.x - this.p2.w/2)*this.w, 0.1*this.h, this.p2.w*this.w, 15);
-        
-        // Ball
-        this.ctx.fillStyle = this.ball.smash ? '#fbbf24' : '#fff';
-        this.ctx.beginPath();
-        this.ctx.arc(this.ball.x*this.w, this.ball.y*this.h, this.ball.smash?10:6, 0, Math.PI*2);
-        this.ctx.fill();
-        
-        // Blocks
-        this.ctx.fillStyle = '#38bdf8';
+        // ブロック
         this.blocks.forEach(b => {
-            if(b.active) this.ctx.fillRect((b.x-0.04)*this.w, (b.y-0.02)*this.h, 0.08*this.w, 0.04*this.h);
+            ctx.fillStyle = b.color;
+            ctx.fillRect(b.x, b.y, b.w, b.h);
+            ctx.strokeRect(b.x, b.y, b.w, b.h);
         });
         
-        document.getElementById('score').innerText = "スコア: " + this.score;
-    },
-    
-    onData(d) {
-        if(d.type === 'input') {
-            if(this.role === 'p1') { // Host receives P2 input
-                this.p2.x = d.x;
-                if(d.tap) this.p2.charge = 10;
-            } 
-        } else if(d.type === 'sync') {
-            if(this.role === 'p2') { // Guest receives State
-                this.ball = d.ball;
-                this.p1 = d.p1; // Host pos
-                this.blocks = d.blocks;
-                this.score = d.score;
-                // Note: P2's own position is local-predicted, but synced loosely
-            }
-        } else if(d.type === 'over') {
-            this.gameOver(d.msg, true);
+        // パドル
+        PaddleData.renderToCanvas(ctx, this.p1.x, this.p1.y, this.p1.w, this.p1.h);
+        if(this.mode === 'online') {
+            // 相手パドル（色は固定）
+            ctx.fillStyle = '#e74c3c';
+            const x = this.p2.x, y = this.p2.y, w = this.p2.w, h = this.p2.h;
+            ctx.fillRect(x - w/2, y - h/2, w, h);
+        }
+        
+        // ボール
+        ctx.beginPath();
+        ctx.arc(this.ball.x, this.ball.y, this.ball.r, 0, Math.PI*2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        
+        // HUD
+        document.getElementById('hud-right').innerText = "SCORE: " + this.score;
+        if(this.mode === 'online') {
+             document.getElementById('hud-left').innerText = this.role === 'p1' ? "あなた(ホスト)" : "あなた(ゲスト)";
         }
     },
     
-    gameOver(msg, remote=false) {
-        cancelAnimationFrame(this.loopId);
-        document.getElementById('modal-result').style.display = 'flex';
-        document.getElementById('res-msg').innerText = msg;
-        AudioSys.play('over');
-        if(!remote && this.mode === 'online') Network.send({ type:'over', msg:msg });
+    // ネットワーク同期
+    syncNetwork() {
+        if(this.role === 'p1') {
+            // ホスト: 全状態を送る
+            Network.send({
+                type: 'sync',
+                p1x: this.p1.x, // 自分の位置
+                bx: this.ball.x, by: this.ball.y
+            });
+        } else {
+            // ゲスト: 自分の位置だけ送る
+            Network.send({
+                type: 'input',
+                x: this.p1.x // 相手から見るとP2の位置
+            });
+        }
+    },
+    
+    onNetworkData(d) {
+        if(d.type === 'sync') {
+            // ゲスト: ホストからの情報で更新
+            // ホストのP1は、ゲスト画面ではP2の位置（上）に表示
+            // 座標変換: Xはそのまま、Yは反転して表示したいが、描画関数でp2.yは固定されているのでXだけ同期
+            this.p2.x = d.p1x;
+            this.ball.x = d.bx;
+            this.ball.y = d.by;
+        } else if(d.type === 'input') {
+            // ホスト: ゲストの入力を反映
+            this.p2.x = d.x;
+        } else if(d.type === 'over') {
+            // 勝敗通知
+            this.gameOver(d.win ? "あなたの勝ち！" : "あなたの負け...");
+        }
+    },
+    
+    gameOver(msg) {
+        this.state = 'over';
+        document.getElementById('result-modal').style.display = 'flex';
+        document.getElementById('result-title').innerText = msg;
+        document.getElementById('result-score').innerText = "SCORE: " + this.score;
+        Sound.play('win');
+    },
+    
+    retry() {
+        if(this.mode === 'online') {
+            // 再戦リクエスト（今回は簡易的にリロードを促す）
+            alert("通信対戦の再戦は一度メニューに戻ってください");
+            location.reload();
+        } else {
+            this.initGame();
+        }
     }
 };
+
 </script>
 </body>
 </html>

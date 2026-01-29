@@ -8,164 +8,138 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;800&family=Orbitron:wght@700&display=swap" rel="stylesheet">
 
 <style>
 :root {
-    --bg-color: #1a1a2e;
-    --text-color: #fff;
-    --primary: #00f2ff; /* Cyan */
-    --accent: #ff0055;  /* Magenta */
-    --gold: #ffd700;
+    --bg-color: #121212;
+    --primary: #00ffff;
+    --accent: #ff0055;
+    --glass: rgba(255, 255, 255, 0.1);
 }
 
 body {
-    margin: 0; background: var(--bg-color); color: var(--text-color);
+    margin: 0; background: var(--bg-color); color: #fff;
     font-family: 'M PLUS Rounded 1c', sans-serif;
     height: 100vh; overflow: hidden; touch-action: none;
     display: flex; justify-content: center; align-items: center;
 }
 
-/* 画面共通 */
 .screen {
     position: absolute; width: 100%; height: 100%;
     display: none; flex-direction: column; align-items: center; justify-content: center;
-    background: radial-gradient(circle at center, #2a2a40 0%, #000 100%);
-    z-index: 1;
+    background: radial-gradient(circle, #222 0%, #000 100%); z-index: 1;
 }
 .screen.active { display: flex; z-index: 10; }
 
-/* UIパーツ */
-h1 { 
-    font-family: 'Orbitron', sans-serif; font-size: 2.5rem; 
-    text-shadow: 0 0 10px var(--primary); margin-bottom: 20px; text-align: center;
-}
+h1 { font-family: 'Orbitron', sans-serif; font-size: 3rem; text-shadow: 0 0 20px var(--primary); margin-bottom: 10px; line-height: 1; text-align: center; }
+.desc { font-size: 0.9rem; color: #aaa; margin-bottom: 30px; text-align: center; }
+
+/* ボタン */
 .btn {
-    width: 80%; max-width: 300px; padding: 15px; margin: 10px;
-    border: 2px solid var(--primary); border-radius: 8px; background: rgba(0,0,0,0.5);
-    color: var(--primary); font-weight: bold; font-size: 1.1rem; cursor: pointer;
-    text-transform: uppercase; transition: 0.2s;
+    width: 280px; padding: 15px; margin: 10px;
+    background: var(--glass); border: 2px solid var(--primary); color: var(--primary);
+    font-family: 'Orbitron', sans-serif; font-size: 1.2rem; cursor: pointer;
+    text-transform: uppercase; letter-spacing: 2px; transition: 0.2s;
+    backdrop-filter: blur(5px);
 }
-.btn:active { background: var(--primary); color: #000; }
+.btn:hover { background: var(--primary); color: #000; box-shadow: 0 0 20px var(--primary); }
 .btn-accent { border-color: var(--accent); color: var(--accent); }
-.btn-accent:active { background: var(--accent); color: #000; }
+.btn-accent:hover { background: var(--accent); color: #000; box-shadow: 0 0 20px var(--accent); }
 
-.input-box {
-    font-size: 1.2rem; padding: 10px; width: 70%; text-align: center;
-    background: #000; border: 1px solid #555; color: #fff; margin: 10px 0;
-}
-
-/* ゲーム画面 */
-#game-container {
-    position: relative; width: 100%; height: 100%; max-width: 600px;
-    background: #000; box-shadow: 0 0 30px rgba(0,0,0,0.5);
+/* ゲームコンテナ */
+#game-wrapper {
+    position: relative; width: 100%; height: 100%; max-width: 600px; max-height: 800px;
+    background: #000; border: 2px solid #333; box-shadow: 0 0 50px rgba(0,0,0,0.8);
 }
 canvas { display: block; width: 100%; height: 100%; }
 
 /* HUD */
 .hud {
-    position: absolute; top: 10px; left: 0; width: 100%;
-    display: flex; justify-content: space-between; padding: 0 20px; box-sizing: border-box;
-    pointer-events: none; font-family: 'Orbitron', sans-serif; z-index: 5;
-    text-shadow: 0 0 5px #000;
+    position: absolute; top: 0; left: 0; width: 100%; padding: 10px;
+    display: flex; justify-content: space-between; box-sizing: border-box;
+    font-family: 'Orbitron'; font-size: 1.2rem; pointer-events: none;
+    text-shadow: 0 2px 0 #000;
 }
 
-/* モバイル操作パネル */
-.control-panel {
-    position: absolute; bottom: 20px; width: 100%;
-    display: flex; justify-content: center; gap: 20px;
-    pointer-events: none; /* 下のキャンバス操作を通すため */
+/* 操作ガイド */
+.controls-guide {
+    position: absolute; bottom: 10px; width: 100%; text-align: center;
+    font-size: 0.7rem; color: #666; pointer-events: none;
 }
-.ctrl-btn {
-    width: 70px; height: 70px; border-radius: 50%;
-    background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3);
-    color: #fff; font-size: 1.5rem; font-weight: bold;
-    display: flex; justify-content: center; align-items: center;
-    pointer-events: auto; cursor: pointer; backdrop-filter: blur(5px);
-    user-select: none; touch-action: none;
-}
-.ctrl-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.95); }
-.btn-charge { border-color: var(--accent); color: var(--accent); width: 80px; height: 80px; }
-.btn-charge.active { background: var(--accent); color: #fff; box-shadow: 0 0 20px var(--accent); }
-
-/* QR・ネットワーク */
-#qr-display { background: #fff; padding: 10px; margin: 15px; border-radius: 5px; }
-#camera-wrapper { width: 90%; max-width: 300px; margin: 10px; border: 2px solid var(--primary); display: none; }
 
 /* モーダル */
 .modal {
     position: absolute; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.9); z-index: 20;
+    background: rgba(0,0,0,0.8); z-index: 20;
     display: none; flex-direction: column; justify-content: center; align-items: center;
 }
-.blink { animation: blink 1s infinite alternate; }
-@keyframes blink { from { opacity: 0.5; } to { opacity: 1; } }
+.modal h2 { font-family: 'Orbitron'; font-size: 3rem; margin-bottom: 20px; text-shadow: 0 0 20px #fff; }
+
+/* ネットワークUI */
+#qr-view { background: #fff; padding: 10px; border-radius: 5px; margin: 20px; }
+#cam-view { width: 250px; border: 2px solid var(--primary); display: none; margin: 20px; }
+.input-code { background: #333; border: 1px solid #555; color: #fff; padding: 10px; font-size: 1.2rem; text-align: center; margin: 10px; width: 200px; }
 
 </style>
 </head>
 <body>
 
 <!-- タイトル -->
-<div id="screen-title" class="screen active">
+<div id="s-title" class="screen active">
     <h1>SMASH<br>BREAKER</h1>
-    <div style="margin-bottom:30px; font-size:0.9rem; color:#aaa;">回転＆チャージ アクション</div>
-    <button class="btn" onclick="Game.startLocal()">ひとりで遊ぶ</button>
-    <button class="btn btn-accent" onclick="Network.openMenu()">通信対戦 (QR/ID)</button>
-    <div style="margin-top:20px; font-size:0.8rem;">操作: スライド移動 / ボタンで回転・チャージ</div>
+    <div class="desc">ぜんまい式チャージ＆スマッシュ<br>キーボード完全対応版</div>
+    
+    <button class="btn" onclick="Game.initLocal()">SOLO / LOCAL 2P</button>
+    <button class="btn btn-accent" onclick="Net.open()">ONLINE BATTLE</button>
+    
+    <div style="margin-top:20px; font-size:0.8rem; color:#888; text-align:left; display:inline-block;">
+        [P1] 矢印キー(移動/回転) + 右Shift(チャージ)<br>
+        [P2] WASD(移動/回転) + 左Shift(チャージ)
+    </div>
 </div>
 
 <!-- ネットワーク -->
-<div id="screen-network" class="screen">
-    <h2>通信対戦</h2>
-    <div id="net-select" style="display:flex; flex-direction:column; align-items:center; width:100%;">
-        <button class="btn" onclick="Network.initHost()">部屋をつくる (ホスト)</button>
-        <div style="margin:5px;">or</div>
-        <button class="btn btn-accent" onclick="Network.showGuest()">部屋に入る (ゲスト)</button>
-        <button class="btn" style="border-color:#555; color:#aaa;" onclick="location.reload()">もどる</button>
+<div id="s-net" class="screen">
+    <h2>ONLINE MODE</h2>
+    <div id="net-menu" style="display:flex; flex-direction:column;">
+        <button class="btn" onclick="Net.host()">ROOM CREATE</button>
+        <button class="btn btn-accent" onclick="Net.guest()">JOIN ROOM</button>
+        <button class="btn" style="border-color:#555; color:#aaa;" onclick="location.reload()">BACK</button>
     </div>
     
-    <div id="net-host" style="display:none; flex-direction:column; align-items:center;">
-        <div id="qr-display"></div>
-        <div>ID: <span id="host-id-text" style="color:var(--primary); font-weight:bold;">---</span></div>
-        <div class="blink" style="color:var(--accent); margin:10px;">接続待ち...</div>
-        <button class="btn" onclick="location.reload()">キャンセル</button>
+    <div id="net-host-ui" style="display:none; flex-direction:column; align-items:center;">
+        <div id="qr-view"></div>
+        <div>ID: <span id="host-id" style="color:var(--primary); font-weight:bold;">...</span></div>
+        <div style="color:var(--accent); margin-top:10px; animation:blink 1s infinite;">WAITING...</div>
     </div>
 
-    <div id="net-guest" style="display:none; flex-direction:column; align-items:center; width:100%;">
-        <div id="camera-wrapper"></div>
-        <button class="btn" onclick="Network.startCamera()">📷 QRを読み取る</button>
-        <input type="text" id="input-id" class="input-box" placeholder="IDを入力">
-        <button class="btn btn-accent" onclick="Network.joinByInput()">IDで参加</button>
-        <button class="btn" onclick="location.reload()">もどる</button>
+    <div id="net-guest-ui" style="display:none; flex-direction:column; align-items:center;">
+        <div id="cam-view"></div>
+        <button class="btn" onclick="Net.startCam()">📷 CAMERA</button>
+        <input type="text" id="join-id" class="input-code" placeholder="Host ID">
+        <button class="btn btn-accent" onclick="Net.joinInput()">CONNECT</button>
     </div>
 </div>
 
-<!-- ゲーム画面 -->
-<div id="screen-game" class="screen" style="background:#000;">
-    <div id="game-container">
-        <canvas id="game-canvas"></canvas>
-        
+<!-- ゲーム -->
+<div id="s-game" class="screen">
+    <div id="game-wrapper">
+        <canvas id="cvs"></canvas>
         <div class="hud">
-            <div id="hud-left">STAGE 1</div>
-            <div id="hud-right">SCORE: 0</div>
+            <div>P1: <span id="score-p1">0</span></div>
+            <div>P2: <span id="score-p2">0</span></div>
         </div>
-
-        <!-- モバイル用操作パネル -->
-        <div class="control-panel">
-            <div class="ctrl-btn" onpointerdown="Input.setRotate(-1)" onpointerup="Input.setRotate(0)" onpointerleave="Input.setRotate(0)">↺</div>
-            <div id="btn-charge" class="ctrl-btn btn-charge" onpointerdown="Input.setCharge(true)" onpointerup="Input.setCharge(false)" onpointerleave="Input.setCharge(false)">⚡</div>
-            <div class="ctrl-btn" onpointerdown="Input.setRotate(1)" onpointerup="Input.setRotate(0)" onpointerleave="Input.setRotate(0)">↻</div>
-        </div>
-
+        <div class="controls-guide" id="guide-text"></div>
+        
         <!-- 結果 -->
-        <div id="result-modal" class="modal">
-            <h2 id="res-title">GAME OVER</h2>
-            <div id="res-score" style="font-size:1.5rem; margin-bottom:20px; font-family:'Orbitron';">SCORE: 0</div>
-            <button class="btn btn-accent" onclick="location.reload()">タイトルへ</button>
+        <div id="res-modal" class="modal">
+            <h2 id="res-msg">WIN!</h2>
+            <button class="btn btn-accent" onclick="location.reload()">TITLE</button>
         </div>
         
         <!-- 待機 -->
-        <div id="wait-overlay" class="modal" style="background:rgba(0,0,0,0.6);">
+        <div id="wait-modal" class="modal">
             <h2>WAITING...</h2>
         </div>
     </div>
@@ -173,11 +147,11 @@ canvas { display: block; width: 100%; height: 100%; }
 
 <script>
 /**
- * SMASH BREAKER - REBORN
- * 回転・チャージ機能復活版
+ * SMASH BREAKER - ZENMAI EDITION
+ * 物理挙動・操作性完全修正版
  */
 
-// 音声
+// --- 音声シンセサイザー ---
 const AudioSys = {
     ctx: null,
     init() { if(!this.ctx) this.ctx = new (window.AudioContext||window.webkitAudioContext)(); },
@@ -188,101 +162,119 @@ const AudioSys = {
         const g = this.ctx.createGain();
         o.connect(g); g.connect(this.ctx.destination);
         
-        if(type==='hit') { o.type='square'; o.frequency.setValueAtTime(400, t); g.gain.exponentialRampToValueAtTime(0.01, t+0.1); }
-        else if(type==='charge') { o.type='sawtooth'; o.frequency.setValueAtTime(100, t); g.gain.linearRampToValueAtTime(0, t+0.2); }
-        else if(type==='smash') { o.type='square'; o.frequency.setValueAtTime(150, t); o.frequency.linearRampToValueAtTime(600, t+0.1); g.gain.exponentialRampToValueAtTime(0.01, t+0.2); }
-        else if(type==='win') { o.type='triangle'; o.frequency.setValueAtTime(523, t); g.gain.linearRampToValueAtTime(0, t+0.5); }
-        
-        o.start(); o.stop(t+0.5);
+        if(type==='hit') { // 通常ヒット
+            o.type='square'; o.frequency.setValueAtTime(400, t);
+            g.gain.exponentialRampToValueAtTime(0.01, t+0.1);
+            o.start(); o.stop(t+0.1);
+        } else if(type==='wind') { // ぜんまい巻き上げ（カリカリ音）
+            o.type='sawtooth'; o.frequency.setValueAtTime(100, t);
+            g.gain.setValueAtTime(0.1, t); g.gain.linearRampToValueAtTime(0, t+0.05);
+            o.start(); o.stop(t+0.05);
+        } else if(type==='smash') { // スマッシュ発射
+            o.type='sawtooth'; o.frequency.setValueAtTime(200, t); o.frequency.linearRampToValueAtTime(50, t+0.3);
+            g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.01, t+0.3);
+            o.start(); o.stop(t+0.3);
+        } else if(type==='break') { // 破壊
+            o.type='square'; o.frequency.setValueAtTime(150, t);
+            g.gain.exponentialRampToValueAtTime(0.01, t+0.2);
+            o.start(); o.stop(t+0.2);
+        } else if(type==='win') { 
+            o.type='triangle'; o.frequency.setValueAtTime(523, t);
+            g.gain.linearRampToValueAtTime(0, t+1.0);
+            o.start(); o.stop(t+1.0);
+        }
     }
 };
 
-// 入力管理
+// --- 入力管理 (P1/P2完全分離) ---
 const Input = {
-    x: null, // マウス/タッチX座標
-    rotate: 0, // -1(左), 0, 1(右)
-    charge: false,
+    p1: { x:0, rot:0, charge:false }, // Arrow, R-Shift
+    p2: { x:0, rot:0, charge:false }, // WASD, L-Shift
     
     init() {
-        // キーボード
-        window.addEventListener('keydown', e => {
-            if(e.code==='ArrowLeft'||e.code==='KeyA') this.x = 'left'; // 簡易移動用フラグ(実際の移動はtouchX優先だがキーも対応)
-            if(e.code==='ArrowRight'||e.code==='KeyD') this.x = 'right';
-            if(e.code==='ArrowUp'||e.code==='KeyW') this.rotate = 1; // 右回転
-            if(e.code==='ArrowDown'||e.code==='KeyS') this.rotate = -1; // 左回転
-            if(e.code==='Space'||e.code==='ShiftLeft') this.charge = true;
-        });
-        window.addEventListener('keyup', e => {
-            if(e.code==='ArrowUp'||e.code==='ArrowDown'||e.code==='KeyW'||e.code==='KeyS') this.rotate = 0;
-            if(e.code==='Space'||e.code==='ShiftLeft') this.charge = false;
-            if(e.code==='ArrowLeft'||e.code==='ArrowRight'||e.code==='KeyA'||e.code==='KeyD') this.x = null;
-        });
-        
-        // タッチ移動 (キャンバス上)
-        const cvs = document.getElementById('game-canvas');
-        const moveHandler = (e) => {
-            e.preventDefault();
-            const rect = cvs.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            // 画面幅に対する比率で位置計算 (解像度対応)
-            const scale = Game.width / rect.width;
-            this.x = (clientX - rect.left) * scale;
-        };
-        cvs.addEventListener('mousemove', moveHandler);
-        cvs.addEventListener('touchmove', moveHandler, {passive:false});
-        cvs.addEventListener('touchstart', moveHandler, {passive:false});
+        window.addEventListener('keydown', e => this.handle(e, true));
+        window.addEventListener('keyup', e => this.handle(e, false));
     },
     
-    setRotate(val) { this.rotate = val; },
-    setCharge(val) { this.charge = val; }
+    handle(e, isDown) {
+        const code = e.code;
+        // P1 Controls (Arrows + Right Shift)
+        if(code==='ArrowLeft') this.p1.x = isDown ? -1 : 0;
+        if(code==='ArrowRight') this.p1.x = isDown ? 1 : 0;
+        if(code==='ArrowUp') this.p1.rot = isDown ? -1 : 0; // 左傾け
+        if(code==='ArrowDown') this.p1.rot = isDown ? 1 : 0; // 右傾け
+        if(code==='ShiftRight') this.p1.charge = isDown;
+
+        // P2 Controls (WASD + Left Shift)
+        if(code==='KeyA') this.p2.x = isDown ? -1 : 0;
+        if(code==='KeyD') this.p2.x = isDown ? 1 : 0;
+        if(code==='KeyW') this.p2.rot = isDown ? -1 : 0;
+        if(code==='KeyS') this.p2.rot = isDown ? 1 : 0;
+        if(code==='ShiftLeft') this.p2.charge = isDown;
+        
+        // Prevent scrolling with arrows
+        if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(code)) e.preventDefault();
+    }
 };
 
-// パドルクラス
+// --- パドルクラス (ぜんまい式) ---
 class Paddle {
-    constructor(x, y, isEnemy=false) {
+    constructor(x, y, color) {
         this.x = x; this.y = y; 
         this.w = 100; this.h = 15;
-        this.angle = 0;
-        this.chargeVal = 0;
-        this.isEnemy = isEnemy;
+        this.color = color;
+        this.angle = 0; // 現在の角度
+        this.baseAngle = 0; // 傾き操作による基準角度
+        
+        // ぜんまいステータス
+        this.windUp = 0; // 巻き上げ量 (0-100)
+        this.spinVel = 0; // 解放時の回転速度
+        this.isSmashing = false; // スマッシュ判定中か
     }
     
-    update(input) {
+    update(inp) {
         // 移動
-        if (typeof input.x === 'number') {
-            this.x += (input.x - this.x) * 0.3; // スムーズ追従
-        } else if (input.x === 'left') {
-            this.x -= 8;
-        } else if (input.x === 'right') {
-            this.x += 8;
-        }
+        this.x += inp.x * 8;
+        this.x = Math.max(this.w/2, Math.min(600-this.w/2, this.x)); // 画面端
         
-        // 画面端制限
-        this.x = Math.max(this.w/2, Math.min(Game.width - this.w/2, this.x));
-        
-        // 回転
-        if (input.rotate !== 0) {
-            this.angle += input.rotate * 0.05;
-            this.angle = Math.max(-0.5, Math.min(0.5, this.angle)); // 角度制限
+        // 回転（チルト）操作: キー入力で基準角度を変える
+        if(inp.rot !== 0) {
+            this.baseAngle += inp.rot * 0.05;
+            this.baseAngle = Math.max(-0.6, Math.min(0.6, this.baseAngle));
         } else {
-            // 操作してないときは徐々に戻る
-            this.angle *= 0.9;
+            this.baseAngle *= 0.9; // 操作してないと戻る
         }
-        
-        // チャージ
-        if (input.charge) {
-            this.chargeVal = Math.min(100, this.chargeVal + 2);
-            if(this.chargeVal % 20 === 0) AudioSys.play('charge');
+
+        // ぜんまいロジック
+        if (inp.charge) {
+            // チャージ中: 逆方向にゆっくり巻く
+            this.windUp = Math.min(100, this.windUp + 2);
+            // 視覚的エフェクト: 震える & 逆回転
+            const shake = (Math.random() - 0.5) * (this.windUp/200);
+            this.angle = this.baseAngle + (this.windUp / 100) * Math.PI + shake; // 180度まで巻くイメージ
+            
+            // 音 (カリカリ音)
+            if(this.windUp < 100 && this.windUp % 10 === 0) AudioSys.play('wind');
+            
         } else {
-            if (this.chargeVal > 0) this.chargeVal -= 5;
-            if (this.chargeVal < 0) this.chargeVal = 0;
-        }
-        
-        // UI連動 (自分のみ)
-        if(!this.isEnemy) {
-            const btn = document.getElementById('btn-charge');
-            if(input.charge) btn.classList.add('active');
-            else btn.classList.remove('active');
+            // 解放時
+            if (this.windUp > 0) {
+                // 溜まった分を回転速度に変換
+                this.spinVel = -(this.windUp / 100) * 1.5; // 逆方向に猛烈スピン
+                this.windUp = 0;
+                this.isSmashing = true;
+                AudioSys.play('smash');
+                
+                // スマッシュ状態は短時間
+                setTimeout(() => { this.isSmashing = false; }, 400);
+            }
+            
+            // スピン減衰 & 基準角度への復帰
+            this.angle += this.spinVel;
+            this.spinVel *= 0.85; // 摩擦
+            
+            // 物理的な戻り
+            this.angle += (this.baseAngle - this.angle) * 0.2;
         }
     }
     
@@ -291,202 +283,241 @@ class Paddle {
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
         
-        // チャージ発光
-        if (this.chargeVal > 0) {
-            ctx.shadowBlur = this.chargeVal;
-            ctx.shadowColor = this.isEnemy ? '#ff0055' : '#00f2ff';
+        // スマッシュ中は発光
+        if(this.isSmashing || this.windUp > 80) {
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = this.color;
         }
         
-        ctx.fillStyle = this.isEnemy ? '#ff0055' : '#00f2ff';
+        ctx.fillStyle = this.color;
         ctx.fillRect(-this.w/2, -this.h/2, this.w, this.h);
         
-        // 芯
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(-this.w/2 + 2, -this.h/2 + 2, this.w - 4, this.h - 4);
+        // 軸
+        ctx.fillStyle = "#fff";
+        ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill();
         
         ctx.restore();
     }
 }
 
-// ゲーム本体
+// --- ゲーム本体 ---
 const Game = {
     canvas: null, ctx: null, loopId: null,
     width: 600, height: 800,
     
     mode: 'local', // local, online
-    role: 'p1',    // p1(host), p2(guest)
-    state: 'title',
+    role: 'p1', // p1(host), p2(guest)
+    state: 'stop',
     
     p1: null, p2: null, ball: null, blocks: [],
-    score: 0, stage: 1,
     
-    startLocal() {
-        this.mode = 'local'; this.role = 'p1';
-        this.init();
+    initLocal() {
+        this.mode = 'local';
+        this.role = 'p1';
+        document.getElementById('guide-text').innerHTML = "P1: 矢印+右Shift | P2: WASD+左Shift";
+        this.start();
     },
-    startOnline(isHost) {
+    
+    initOnline(isHost) {
         this.mode = 'online';
         this.role = isHost ? 'p1' : 'p2';
-        this.init();
+        document.getElementById('guide-text').innerHTML = isHost ? "YOU: P1 (矢印+右Shift)" : "YOU: P2 (WASD+左Shift)";
+        this.start();
     },
     
-    init() {
+    start() {
         AudioSys.init();
         Input.init();
-        
         document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
-        document.getElementById('screen-game').classList.add('active');
-        document.getElementById('result-modal').style.display='none';
-        document.getElementById('wait-overlay').style.display='none';
+        document.getElementById('s-game').classList.add('active');
+        document.getElementById('res-modal').style.display='none';
+        document.getElementById('wait-modal').style.display='none';
         
-        this.canvas = document.getElementById('game-canvas');
+        this.canvas = document.getElementById('cvs');
         this.ctx = this.canvas.getContext('2d');
-        // 解像度合わせ
-        const rect = document.getElementById('game-container').getBoundingClientRect();
-        this.canvas.width = this.width = 600; 
-        this.canvas.height = this.height = 800; // 内部解像度は固定
+        this.canvas.width = 600; this.canvas.height = 800;
         
-        this.p1 = new Paddle(300, 750);
-        this.p2 = new Paddle(300, 50, true);
-        this.ball = { x:300, y:400, r:8, vx:0, vy:0, speed:8, power:false };
+        // オブジェクト生成
+        this.p1 = new Paddle(300, 750, '#00ffff');
+        this.p2 = new Paddle(300, 50, '#ff0055');
         
-        this.setupStage(1);
         this.resetBall();
+        this.createBlocks();
         
-        this.state = 'playing';
+        this.state = 'play';
         if(this.loopId) cancelAnimationFrame(this.loopId);
         this.loop();
     },
     
-    setupStage(lvl) {
-        this.stage = lvl; this.score = 0; this.blocks = [];
-        if(this.mode === 'online') return; // オンラインはブロックなし（対戦特化）
+    resetBall() {
+        this.ball = { x:300, y:400, r:10, vx:0, vy:0, isSmash:false };
+        // 最初はゆっくり
+        const a = Math.PI/2 + (Math.random()-0.5);
+        const speed = 6;
+        this.ball.vx = Math.cos(a) * speed;
+        this.ball.vy = Math.sin(a) * speed * (this.role==='p1'?1:-1);
         
-        const rows = 3 + lvl;
-        for(let r=0; r<rows; r++) {
-            for(let c=0; c<8; c++) {
-                if(Math.random()>0.2) {
-                    this.blocks.push({
-                        x: 40 + c * 70, y: 100 + r * 30, w: 60, h: 20,
-                        color: `hsl(${r*40}, 70%, 50%)`, hp: 1
-                    });
-                }
-            }
+        // Online Guestはボール計算しない（同期待つ）
+        if(this.mode==='online' && this.role==='p2') { this.ball.vx=0; this.ball.vy=0; }
+    },
+    
+    createBlocks() {
+        this.blocks = [];
+        // 中央に少しだけ配置（対戦の邪魔にならない程度）
+        for(let i=0; i<5; i++) {
+            this.blocks.push({
+                x: 100 + i*100, y: 400, w: 80, h: 20, color: '#ffff00', active:true
+            });
         }
     },
     
-    resetBall() {
-        this.ball.x = 300; this.ball.y = 400; this.ball.power = false;
-        const a = Math.PI/2 + (Math.random()-0.5);
-        this.ball.vx = Math.cos(a) * this.ball.speed;
-        this.ball.vy = Math.sin(a) * this.ball.speed * (this.mode==='local'?-1: (this.role==='p1'?1:-1)); 
-        // ローカルは上へ、オンラインは役割に応じて（Hostなら下へ、Guestなら上へ...調整必要）
-        if(this.mode==='online' && this.role==='p2') { this.ball.vx=0; this.ball.vy=0; } // Guestは計算しない
-    },
-    
     loop() {
-        if(this.state !== 'playing') return;
+        if(this.state !== 'play') return;
+        
         this.update();
         this.draw();
-        if(this.mode==='online') this.sync();
+        
+        if(this.mode === 'online') this.sync();
         this.loopId = requestAnimationFrame(()=>this.loop());
     },
     
     update() {
-        // 自機更新
-        this.p1.update(Input);
+        // パドル更新
+        if(this.mode === 'local') {
+            this.p1.update(Input.p1);
+            this.p2.update(Input.p2);
+        } else {
+            // オンライン: 自分のキャラだけ操作、相手はデータ受信で動く
+            if(this.role === 'p1') this.p1.update(Input.p1);
+            else this.p2.update(Input.p2);
+        }
         
-        // 物理演算 (Local or Host)
-        if(this.mode==='local' || (this.mode==='online' && this.role==='p1')) {
-            // 敵AI (ローカルのみ)
-            if(this.mode==='local') {
-                // 簡易AI
-                this.p2.x += (this.ball.x - this.p2.x) * 0.1;
-                this.p2.angle = 0; // AIは回転しない
+        // 物理 (Local または Host のみ計算)
+        if(this.mode === 'local' || (this.mode === 'online' && this.role === 'p1')) {
+            this.updatePhysics();
+        }
+    },
+    
+    updatePhysics() {
+        const b = this.ball;
+        const spd = b.isSmash ? 1.5 : 1.0; // スマッシュ時は高速化
+        
+        b.x += b.vx * spd;
+        b.y += b.vy * spd;
+        
+        // 壁
+        if(b.x < b.r || b.x > 600-b.r) b.vx *= -1;
+        
+        // パドル衝突 (回転行列でOBB判定)
+        this.checkPaddleHit(this.p1);
+        this.checkPaddleHit(this.p2);
+        
+        // ブロック
+        this.blocks.forEach(blk => {
+            if(!blk.active) return;
+            if(b.x > blk.x && b.x < blk.x+blk.w && b.y > blk.y && b.y < blk.y+blk.h) {
+                if(!b.isSmash) b.vy *= -1; // スマッシュは貫通
+                blk.active = false;
+                AudioSys.play('break');
             }
+        });
+        
+        // ゴール判定
+        if(b.y > 800) this.goal('p2');
+        if(b.y < 0) this.goal('p1');
+    },
+    
+    // 回転パドルとの衝突計算
+    checkPaddleHit(p) {
+        const b = this.ball;
+        
+        // ボール座標をパドル中心を原点とし、パドル角度分逆回転させた座標系に変換
+        const dx = b.x - p.x;
+        const dy = b.y - p.y;
+        const cos = Math.cos(-p.angle);
+        const sin = Math.sin(-p.angle);
+        const localX = dx * cos - dy * sin;
+        const localY = dx * sin + dy * cos;
+        
+        // AABB判定 (ローカル座標系)
+        if (localX > -p.w/2 - b.r && localX < p.w/2 + b.r &&
+            localY > -p.h/2 - b.r && localY < p.h/2 + b.r) {
             
-            // ボール移動
-            const b = this.ball;
-            const speed = b.power ? 15 : b.speed;
-            b.x += b.vx; b.y += b.vy;
-            
-            // 壁
-            if(b.x < b.r || b.x > this.width - b.r) b.vx *= -1;
-            
-            // パドル衝突 (回転考慮)
-            this.checkPaddle(b, this.p1);
-            this.checkPaddle(b, this.p2);
-            
-            // ローカル天井反射
-            if(this.mode==='local' && b.y < b.r) b.vy *= -1;
-            
-            // ブロック
-            for(let i=this.blocks.length-1; i>=0; i--) {
-                const blk = this.blocks[i];
-                if(b.x > blk.x && b.x < blk.x+blk.w && b.y > blk.y && b.y < blk.y+blk.h) {
-                    if(!b.power) b.vy *= -1; // パワーボールは貫通
-                    this.blocks.splice(i,1);
-                    this.score += 100;
-                    AudioSys.play('hit');
-                }
-            }
-            
-            // 落下判定
-            if(b.y > this.height + 20) {
-                if(this.mode==='local') this.gameOver("GAME OVER");
-                else {
-                    this.gameOver("LOSE...");
-                    Network.send({ type:'over', win:true });
-                }
-            }
-            if(this.mode==='online' && b.y < -20) {
-                this.gameOver("WIN!");
-                Network.send({ type:'over', win:false });
-            }
-            
-            // クリア判定
-            if(this.mode==='local' && this.blocks.length===0) {
-                this.setupStage(this.stage+1);
-                this.resetBall();
+            // 衝突！
+            // スマッシュ判定: パドルが高速回転中ならスマッシュ化
+            if(p.isSmashing) {
+                b.isSmash = true;
+                // スマッシュ時は超加速
+                const speed = 15;
+                // 角度はパドルの向きに依存
+                const smashAng = p.angle - Math.PI/2; // 上向き基準
+                b.vx = Math.cos(smashAng) * speed + (localX/p.w)*5; // 横位置でカーブ
+                b.vy = Math.sin(smashAng) * speed; 
+                if(p === this.p2) b.vy = Math.abs(b.vy); // P2は下へ
+                else b.vy = -Math.abs(b.vy);             // P1は上へ
+                
+                AudioSys.play('smash');
+                
+            } else {
+                // 通常反射
+                // Y速度反転 + パドルの回転速度を加算（スピン）
+                // 簡易計算: ローカルYを反転してワールドに戻す
+                const vCos = Math.cos(p.angle);
+                const vSin = Math.sin(p.angle);
+                
+                // 垂直成分を反転
+                // 簡易的に、法線ベクトルを使って反射させる
+                const nx = Math.sin(p.angle); // パドル面の法線X
+                const ny = -Math.cos(p.angle); // パドル面の法線Y
+                
+                const dot = b.vx * nx + b.vy * ny;
+                b.vx = b.vx - 2 * dot * nx;
+                b.vy = b.vy - 2 * dot * ny;
+                
+                // 少し加速
+                b.vx *= 1.05; b.vy *= 1.05;
+                b.isSmash = false;
+                
+                AudioSys.play('hit');
+                
+                // めり込み防止（押し出し）
+                b.x += b.vx * 2;
+                b.y += b.vy * 2;
             }
         }
     },
     
-    // 回転パドルとの衝突判定 (簡易版: 角度を加算)
-    checkPaddle(b, p) {
-        // AABBチェック
-        if(b.x > p.x - p.w/2 - b.r && b.x < p.x + p.w/2 + b.r &&
-           b.y > p.y - p.h/2 - b.r && b.y < p.y + p.h/2 + b.r) {
-            
-            // 簡易的にY速度反転 + 角度によるX速度変化
-            b.vy *= -1;
-            
-            // パドルの角度に応じてX速度を変化（スピン）
-            b.vx += p.angle * 10;
-            
-            // 位置補正
-            b.y += b.vy * 2; 
-            
-            // チャージ解放判定
-            if(p.chargeVal > 80) {
-                b.power = true;
-                AudioSys.play('smash');
-                p.chargeVal = 0; // 消費
-            } else {
-                b.power = false;
-                AudioSys.play('hit');
-            }
+    goal(winner) {
+        if(this.mode === 'online') {
+            Net.send({ type:'over', winner:winner });
         }
+        this.gameOver(winner);
+    },
+    
+    gameOver(winner) {
+        this.state = 'stop';
+        document.getElementById('res-modal').style.display='flex';
+        let msg = "";
+        if(this.mode === 'local') {
+            msg = (winner==='p1' ? "P1 WIN!" : "P2 WIN!");
+        } else {
+            msg = (winner===this.role ? "YOU WIN!" : "YOU LOSE...");
+        }
+        document.getElementById('res-msg').innerText = msg;
+        AudioSys.play('win');
     },
     
     draw() {
         const ctx = this.ctx;
-        ctx.clearRect(0,0,this.width,this.height);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0,0,600,800);
         
         // ブロック
         this.blocks.forEach(b => {
-            ctx.fillStyle = b.color;
-            ctx.fillRect(b.x, b.y, b.w, b.h);
+            if(b.active) {
+                ctx.fillStyle = b.color;
+                ctx.fillRect(b.x, b.y, b.w, b.h);
+            }
         });
         
         // パドル
@@ -494,105 +525,94 @@ const Game = {
         this.p2.draw(ctx);
         
         // ボール
+        ctx.fillStyle = this.ball.isSmash ? '#ffff00' : '#fff';
+        if(this.ball.isSmash) {
+            ctx.shadowBlur = 20; ctx.shadowColor = '#ffff00';
+        }
         ctx.beginPath();
         ctx.arc(this.ball.x, this.ball.y, this.ball.r, 0, Math.PI*2);
-        ctx.fillStyle = this.ball.power ? '#ffff00' : '#fff';
-        if(this.ball.power) {
-            ctx.shadowBlur = 20; ctx.shadowColor = '#ffff00';
-        } else {
-            ctx.shadowBlur = 0;
-        }
-        ctx.fill(); ctx.shadowBlur = 0;
-        
-        // UI
-        document.getElementById('hud-right').innerText = "SCORE: " + this.score;
+        ctx.fill();
+        ctx.shadowBlur = 0;
     },
     
     // --- ネットワーク同期 ---
     sync() {
         if(this.role === 'p1') {
-            // ホスト: 全データ送信
-            Network.send({
+            // ホスト: 全状態送信
+            Net.send({
                 type: 'sync',
-                p1: { x:this.p1.x, a:this.p1.angle, c:this.p1.chargeVal },
-                b: { x:this.ball.x, y:this.ball.y, p:this.ball.power }
+                p1: { x:this.p1.x, a:this.p1.angle, w:this.p1.windUp, s:this.p1.isSmashing },
+                b: this.ball,
+                bl: this.blocks.map(b=>b.active) // ブロック状態
             });
         } else {
-            // ゲスト: 自分の入力送信
-            Network.send({
+            // ゲスト: 自分の入力状態送信
+            Net.send({
                 type: 'input',
-                x: this.p1.x, a: this.p1.angle, c: this.p1.chargeVal
+                p2: { x:this.p2.x, a:this.p2.angle, w:this.p2.windUp, s:this.p2.isSmashing }
             });
         }
     },
     
-    onNetworkData(d) {
+    onNetData(d) {
         if(d.type === 'sync') {
-            // ゲスト側: 相手(P1=Host)は画面上(P2)に表示
-            this.p2.x = d.p1.x; this.p2.angle = d.p1.a; this.p2.chargeVal = d.p1.c;
-            this.ball.x = d.b.x; this.ball.y = d.b.y; this.ball.power = d.b.p;
+            // ゲスト受信: P1(相手)とボールとブロックを更新
+            this.p1.x = d.p1.x; this.p1.angle = d.p1.a; this.p1.windUp = d.p1.w; this.p1.isSmashing = d.p1.s;
+            this.ball = d.b;
+            if(d.bl) d.bl.forEach((act, i) => { if(this.blocks[i]) this.blocks[i].active = act; });
         } else if(d.type === 'input') {
-            // ホスト側: 相手(P2=Guest)の入力反映
-            this.p2.x = d.x; this.p2.angle = d.a; this.p2.chargeVal = d.c;
+            // ホスト受信: P2(相手)の動きを更新
+            this.p2.x = d.p2.x; this.p2.angle = d.p2.a; this.p2.windUp = d.p2.w; this.p2.isSmashing = d.p2.s;
         } else if(d.type === 'over') {
-            this.gameOver(d.win ? "WIN!" : "LOSE...");
+            this.gameOver(d.winner);
         }
-    },
-    
-    gameOver(msg) {
-        this.state = 'over';
-        document.getElementById('result-modal').style.display = 'flex';
-        document.getElementById('res-title').innerText = msg;
-        document.getElementById('res-score').innerText = "SCORE: " + this.score;
-        AudioSys.play('win');
     }
 };
 
-// ネットワーククラス
-const Network = {
+// --- 通信クラス ---
+const Net = {
     peer: null, conn: null, scanner: null,
     
-    openMenu() {
+    open() {
         document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
-        document.getElementById('screen-network').classList.add('active');
-        document.getElementById('net-select').style.display='flex';
-        document.getElementById('net-host').style.display='none';
-        document.getElementById('net-guest').style.display='none';
+        document.getElementById('s-net').classList.add('active');
+        document.getElementById('net-menu').style.display='flex';
+        document.getElementById('net-host-ui').style.display='none';
+        document.getElementById('net-guest-ui').style.display='none';
     },
     
-    initHost() {
-        document.getElementById('net-select').style.display='none';
-        document.getElementById('net-host').style.display='flex';
+    host() {
+        document.getElementById('net-menu').style.display='none';
+        document.getElementById('net-host-ui').style.display='flex';
         this.peer = new Peer();
         this.peer.on('open', id => {
-            document.getElementById('host-id-text').innerText = id;
-            document.getElementById('qr-display').innerHTML = "";
-            new QRCode(document.getElementById("qr-display"), { text:id, width:150, height:150 });
+            document.getElementById('host-id').innerText = id;
+            document.getElementById('qr-view').innerHTML = '';
+            new QRCode(document.getElementById("qr-view"), { text:id, width:150, height:150 });
         });
         this.peer.on('connection', c => {
             this.conn = c; this.setup();
-            Game.startOnline(true);
+            Game.initOnline(true);
         });
     },
     
-    showGuest() {
-        document.getElementById('net-select').style.display='none';
-        document.getElementById('net-guest').style.display='flex';
+    guest() {
+        document.getElementById('net-menu').style.display='none';
+        document.getElementById('net-guest-ui').style.display='flex';
     },
     
-    startCamera() {
-        const w = document.getElementById('camera-wrapper');
-        w.style.display='block';
-        this.scanner = new Html5QrcodeScanner("camera-wrapper", { fps: 10, qrbox: 200 });
+    startCam() {
+        document.getElementById('cam-view').style.display='block';
+        this.scanner = new Html5QrcodeScanner("cam-view", { fps:10, qrbox:200 });
         this.scanner.render(id => {
             this.join(id);
             this.scanner.clear();
-            w.style.display='none';
+            document.getElementById('cam-view').style.display='none';
         });
     },
     
-    joinByInput() {
-        const id = document.getElementById('input-id').value;
+    joinInput() {
+        const id = document.getElementById('join-id').value;
         if(id) this.join(id);
     },
     
@@ -601,16 +621,17 @@ const Network = {
         this.peer.on('open', () => {
             this.conn = this.peer.connect(id);
             this.setup();
-            Game.startOnline(false);
+            Game.initOnline(false);
         });
     },
     
     setup() {
-        this.conn.on('data', d => Game.onNetworkData(d));
-        this.conn.on('close', () => alert("通信切断"));
+        this.conn.on('data', d => Game.onNetData(d));
+        this.conn.on('open', () => console.log('Connected'));
+        this.conn.on('close', () => alert('Disconneted'));
     },
     
-    send(d) { if(this.conn) this.conn.send(d); }
+    send(d) { if(this.conn && this.conn.open) this.conn.send(d); }
 };
 
 </script>

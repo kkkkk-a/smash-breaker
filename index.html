@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>カルク＆クラッシュ</title>
+    <title>スマッシュブレイカー (修正済)</title>
     
     <!-- 必要なライブラリ -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -19,13 +19,12 @@
     --accent: #e74c3c;  /* 赤 */
     --success: #2ecc71; /* 緑 */
     --warning: #f1c40f; /* 黄 */
-    --canvas-bg: #1a1a2e;
 }
 
 body {
     margin: 0; background: var(--bg-color); color: var(--text-color);
     font-family: 'M PLUS Rounded 1c', sans-serif;
-    height: 100vh; overflow: hidden; touch-action: none; /* スクロール禁止 */
+    height: 100vh; overflow: hidden; touch-action: none;
     display: flex; justify-content: center; align-items: center;
 }
 
@@ -39,7 +38,6 @@ body {
 
 /* UIパーツ */
 h1 { font-size: 2.5rem; margin-bottom: 10px; text-align: center; color: #34495e; text-shadow: 2px 2px 0px rgba(0,0,0,0.1); }
-h2 { font-size: 1.5rem; margin-bottom: 20px; }
 
 .btn {
     width: 80%; max-width: 320px; padding: 16px; margin: 8px;
@@ -87,9 +85,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .palette { display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; width: 320px; }
 .color-swatch { width: 35px; height: 35px; border-radius: 50%; border: 2px solid #fff; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
 .color-swatch.active { transform: scale(1.2); border-color: #333; }
-.eraser { background: 
-    repeating-linear-gradient(45deg, #ccc, #ccc 5px, #fff 5px, #fff 10px); 
-}
+.eraser { background: repeating-linear-gradient(45deg, #ccc, #ccc 5px, #fff 5px, #fff 10px); }
 
 /* モーダル */
 .modal {
@@ -101,6 +97,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .modal h2 { font-size: 3rem; margin-bottom: 10px; text-shadow: 0 0 10px var(--warning); }
 .score-result { font-size: 1.5rem; margin-bottom: 30px; font-family: monospace; }
 
+@keyframes blink { 50% { opacity: 0.5; } }
 </style>
 </head>
 <body>
@@ -149,6 +146,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 <!-- 3. エディタ画面 -->
 <div id="screen-editor" class="screen">
     <h2>パドル工房</h2>
+    <div style="font-size:0.8rem; margin-bottom:10px; color:#666;">なぞって描けます</div>
     <div id="editor-grid" class="editor-grid"></div>
     <div id="palette" class="palette"></div>
     <div style="display:flex; gap:10px; width:90%; justify-content:center;">
@@ -182,17 +180,15 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     </div>
 </div>
 
-<style>
-@keyframes blink { 50% { opacity: 0.5; } }
-</style>
-
 <script>
 /**
- * SMASH BREAKER - COMPLETE EDITION
- * 日本語化・操作性改善・QR対応
+ * SMASH BREAKER - COMPLETE EDITION (FIXED)
+ * 修正: releasePointerCapture エラーの解消
+ * 修正: Network.openMenu の実装漏れ解消
+ * 改善: エディタのなぞり描き機能の安定化
  */
 
-// --- 音声管理 (シンプル版) ---
+// --- 音声管理 ---
 const Sound = {
     ctx: null,
     init() { if(!this.ctx) this.ctx = new (window.AudioContext||window.webkitAudioContext)(); },
@@ -203,20 +199,20 @@ const Sound = {
         const g = this.ctx.createGain();
         o.connect(g); g.connect(this.ctx.destination);
 
-        if(type === 'hit') { // ボールヒット
+        if(type === 'hit') {
             o.type = 'square'; o.frequency.setValueAtTime(400, t);
             g.gain.exponentialRampToValueAtTime(0.01, t+0.1);
             o.start(); o.stop(t+0.1);
-        } else if(type === 'break') { // ブロック破壊
+        } else if(type === 'break') {
             o.type = 'sawtooth'; o.frequency.setValueAtTime(200, t);
             o.frequency.linearRampToValueAtTime(50, t+0.2);
             g.gain.exponentialRampToValueAtTime(0.01, t+0.2);
             o.start(); o.stop(t+0.2);
-        } else if(type === 'paddle') { // パドル反射
+        } else if(type === 'paddle') {
             o.type = 'sine'; o.frequency.setValueAtTime(800, t);
             g.gain.exponentialRampToValueAtTime(0.01, t+0.1);
             o.start(); o.stop(t+0.1);
-        } else if(type === 'win') { // 勝利
+        } else if(type === 'win') {
             o.type = 'triangle';
             o.frequency.setValueAtTime(523, t); o.frequency.setValueAtTime(1046, t+0.2);
             g.gain.linearRampToValueAtTime(0, t+0.5);
@@ -225,41 +221,35 @@ const Sound = {
     }
 };
 
-// --- パドルデータ (エディタ用) ---
+// --- パドルデータ ---
 const PaddleData = {
-    pixels: new Array(16*16).fill(null), // 16x16 grid
+    pixels: new Array(16*16).fill(null),
     colors: ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#ecf0f1', '#95a5a6', '#34495e', '#000000'],
     customized: false,
     
     renderToCanvas(ctx, x, y, w, h) {
         if(!this.customized) {
-            // デフォルトデザイン (スタイリッシュなバー)
             ctx.fillStyle = '#3498db';
             ctx.beginPath();
             ctx.roundRect(x - w/2, y - h/2, w, h, 10);
             ctx.fill();
-            // 光沢
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
             ctx.fillRect(x - w/2 + 5, y - h/2 + 2, w - 10, h/2 - 2);
         } else {
-            // カスタムドット絵
             const size = w / 16;
             const startX = x - w/2;
-            const startY = y - w/2; // 正方形として描画
-            
+            const startY = y - w/2;
             for(let i=0; i<256; i++) {
                 if(this.pixels[i]) {
                     ctx.fillStyle = this.pixels[i];
-                    const px = i % 16;
-                    const py = Math.floor(i / 16);
-                    ctx.fillRect(startX + px*size, startY + py*size, size, size);
+                    ctx.fillRect(startX + (i%16)*size, startY + Math.floor(i/16)*size, size, size);
                 }
             }
         }
     }
 };
 
-// --- エディタ機能 ---
+// --- エディタ機能 (修正版) ---
 const Editor = {
     selectedColor: '#3498db',
     
@@ -276,21 +266,43 @@ const Editor = {
         PaddleData.pixels.forEach((col, i) => {
             const div = document.createElement('div');
             div.className = 'pixel';
+            div.dataset.index = i; // インデックスを保持
             if(col) div.style.backgroundColor = col;
-            
-            // タッチ/マウス描画
-            const paint = () => { div.style.backgroundColor = this.selectedColor; PaddleData.pixels[i] = this.selectedColor; };
-            div.onpointerdown = (e) => { e.releasePointerCapture(e.pointerId); paint(); };
-            div.onpointerenter = (e) => { if(e.buttons===1) paint(); };
-            
             grid.appendChild(div);
         });
+
+        // ポインターイベントで「なぞり描き」を実装（グリッド親要素で一括管理）
+        // これにより releasePointerCapture のエラーを回避し、動作を安定させる
+        const paintAt = (clientX, clientY) => {
+            const el = document.elementFromPoint(clientX, clientY);
+            if (el && el.classList.contains('pixel')) {
+                const idx = parseInt(el.dataset.index);
+                el.style.backgroundColor = this.selectedColor;
+                PaddleData.pixels[idx] = this.selectedColor;
+            }
+        };
+
+        grid.onpointerdown = (e) => {
+            e.preventDefault(); // スクロール防止
+            paintAt(e.clientX, e.clientY);
+            grid.setPointerCapture(e.pointerId); // グリッド全体でキャプチャ
+        };
+
+        grid.onpointermove = (e) => {
+            if (e.buttons === 1) { // 押している間だけ
+                e.preventDefault();
+                paintAt(e.clientX, e.clientY);
+            }
+        };
+        
+        grid.onpointerup = (e) => {
+            grid.releasePointerCapture(e.pointerId);
+        };
     },
     
     initPalette() {
         const pal = document.getElementById('palette');
         pal.innerHTML = '';
-        // カラー
         PaddleData.colors.forEach(c => {
             const d = document.createElement('div');
             d.className = 'color-swatch';
@@ -299,7 +311,6 @@ const Editor = {
             if(c === this.selectedColor) d.classList.add('active');
             pal.appendChild(d);
         });
-        // 消しゴム
         const e = document.createElement('div');
         e.className = 'color-swatch eraser';
         e.onclick = () => { this.setColor(null, e); };
@@ -329,11 +340,11 @@ const Editor = {
     }
 };
 
-// --- ネットワーク機能 ---
+// --- ネットワーク機能 (修正版: openMenu追加) ---
 const Network = {
     peer: null, conn: null, isHost: false, scanner: null,
     
-    // 【修正箇所】メニューを開く機能を追加
+    // 【修正】メニュー表示メソッドを追加
     openMenu() {
         document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
         document.getElementById('screen-network').classList.add('active');
@@ -408,22 +419,14 @@ const Network = {
 // --- ゲーム本体 ---
 const Game = {
     canvas: null, ctx: null, loopId: null,
-    mode: 'local', // local, online
-    role: 'p1', // p1(host), p2(guest)
-    state: 'title', // playing, over
-    
+    mode: 'local', role: 'p1', state: 'title',
     width: 600, height: 800,
     
-    // オブジェクト
     p1: { x: 300, y: 750, w: 100, h: 20 },
-    p2: { x: 300, y: 50, w: 100, h: 20 }, // 対戦相手
+    p2: { x: 300, y: 50, w: 100, h: 20 },
     ball: { x: 300, y: 400, r: 8, vx: 0, vy: 0, speed: 7 },
     blocks: [],
-    
-    score: 0, stage: 1,
-    
-    // 入力
-    touchX: null,
+    score: 0, stage: 1, touchX: null,
     
     startLocal() {
         Sound.init();
@@ -446,22 +449,16 @@ const Game = {
         
         this.canvas = document.getElementById('game-canvas');
         this.ctx = this.canvas.getContext('2d');
-        
-        // サイズ調整
         const rect = document.getElementById('game-container').getBoundingClientRect();
         this.canvas.width = this.width = rect.width;
         this.canvas.height = this.height = rect.height;
         
-        // オブジェクト初期配置
-        this.p1.y = this.height - 50;
-        this.p1.x = this.width / 2;
-        this.p2.y = 50;
-        this.p2.x = this.width / 2;
+        this.p1.y = this.height - 50; this.p1.x = this.width / 2;
+        this.p2.y = 50; this.p2.x = this.width / 2;
         
         this.setupStage(1);
         this.resetBall();
         
-        // 入力イベント
         this.canvas.onpointermove = (e) => {
             e.preventDefault();
             const rect = this.canvas.getBoundingClientRect();
@@ -483,12 +480,8 @@ const Game = {
         this.blocks = [];
         this.score = 0;
         
-        if(this.mode === 'online') {
-            // 対戦モード: 中央に障害物を配置しない
-            return;
-        }
+        if(this.mode === 'online') return;
 
-        // 通常モード: ブロック配置
         const rows = 5 + lvl;
         const cols = 7;
         const bw = (this.width - 40) / cols;
@@ -498,11 +491,7 @@ const Game = {
             for(let c=0; c<cols; c++) {
                 if(Math.random() > 0.1) {
                     this.blocks.push({
-                        x: 20 + c * bw,
-                        y: 80 + r * bh,
-                        w: bw - 4,
-                        h: bh - 4,
-                        hp: 1,
+                        x: 20 + c * bw, y: 80 + r * bh, w: bw - 4, h: bh - 4,
                         color: `hsl(${r * 40}, 70%, 60%)`
                     });
                 }
@@ -514,12 +503,10 @@ const Game = {
         this.ball.x = this.width / 2;
         this.ball.y = this.height / 2;
         this.ball.speed = 6 + (this.stage * 0.5);
-        // ランダムな角度で発射
         const angle = Math.random() * Math.PI / 2 + (Math.PI / 4);
         this.ball.vx = Math.cos(angle) * this.ball.speed * (Math.random()>0.5?1:-1);
         this.ball.vy = Math.sin(angle) * this.ball.speed * (Math.random()>0.5?1:-1);
         
-        // オンラインホストのみがボール計算を行う
         if(this.mode === 'online' && this.role === 'p2') {
             this.ball.vx = 0; this.ball.vy = 0;
         }
@@ -527,29 +514,18 @@ const Game = {
     
     loop() {
         if(this.state !== 'playing') return;
-        
         this.update();
         this.draw();
-        
-        if(this.mode === 'online') {
-            this.syncNetwork();
-        }
-        
+        if(this.mode === 'online') this.syncNetwork();
         this.loopId = requestAnimationFrame(() => this.loop());
     },
     
     update() {
-        // 自機移動
-        if(this.touchX !== null) {
-            // スムーズ移動
-            this.p1.x += (this.touchX - this.p1.x) * 0.3;
-        }
-        // 画面端制限
+        if(this.touchX !== null) this.p1.x += (this.touchX - this.p1.x) * 0.3;
         const hw = this.p1.w / 2;
         if(this.p1.x < hw) this.p1.x = hw;
         if(this.p1.x > this.width - hw) this.p1.x = this.width - hw;
 
-        // ボール計算 (ローカル または オンラインホスト)
         if(this.mode === 'local' || (this.mode === 'online' && this.role === 'p1')) {
             this.updatePhysics();
         }
@@ -557,60 +533,44 @@ const Game = {
     
     updatePhysics() {
         const b = this.ball;
-        b.x += b.vx;
-        b.y += b.vy;
+        b.x += b.vx; b.y += b.vy;
         
-        // 壁反射
         if(b.x < b.r || b.x > this.width - b.r) b.vx *= -1;
         
-        // P1パドル反射
         if(this.hitRect(b, this.p1)) {
-            b.vy = -Math.abs(b.vy);
-            // 摩擦を加える（横移動の影響）
-            b.vx += (b.x - this.p1.x) * 0.1;
+            b.vy = -Math.abs(b.vy); b.vx += (b.x - this.p1.x) * 0.1;
             Sound.play('paddle');
         }
         
-        // P2/CPUパドル反射
         if(this.mode === 'online') {
             if(this.hitRect(b, this.p2)) {
-                b.vy = Math.abs(b.vy);
-                b.vx += (b.x - this.p2.x) * 0.1;
+                b.vy = Math.abs(b.vy); b.vx += (b.x - this.p2.x) * 0.1;
                 Sound.play('paddle');
             }
         } else {
-            // ローカル上壁
             if(b.y < b.r) b.vy *= -1;
         }
         
-        // ブロック衝突
         for(let i=this.blocks.length-1; i>=0; i--) {
             const blk = this.blocks[i];
             if(b.x > blk.x && b.x < blk.x + blk.w && b.y > blk.y && b.y < blk.y + blk.h) {
-                b.vy *= -1;
-                this.blocks.splice(i, 1);
-                this.score += 100;
-                Sound.play('break');
-                break;
+                b.vy *= -1; this.blocks.splice(i, 1);
+                this.score += 100; Sound.play('break'); break;
             }
         }
         
-        // 落下判定
         if(b.y > this.height + 20) {
             if(this.mode === 'online') {
                 this.gameOver("あなたの負け...");
-                Network.send({ type: 'over', win: true }); // 相手に勝ちを伝える
+                Network.send({ type: 'over', win: true });
             } else {
                 this.gameOver("GAME OVER");
             }
         }
-        // 天井判定 (オンラインのみ)
         if(this.mode === 'online' && b.y < -20) {
             this.gameOver("あなたの勝ち！");
-            Network.send({ type: 'over', win: false }); // 相手に負けを伝える
+            Network.send({ type: 'over', win: false });
         }
-        
-        // ローカルクリア判定
         if(this.mode === 'local' && this.blocks.length === 0) {
             this.setupStage(this.stage + 1);
             this.resetBall();
@@ -618,74 +578,49 @@ const Game = {
     },
     
     hitRect(b, p) {
-        return (b.x > p.x - p.w/2 && b.x < p.x + p.w/2 && 
-                b.y > p.y - p.h/2 && b.y < p.y + p.h/2);
+        return (b.x > p.x - p.w/2 && b.x < p.x + p.w/2 && b.y > p.y - p.h/2 && b.y < p.y + p.h/2);
     },
     
     draw() {
         const ctx = this.ctx;
         ctx.clearRect(0, 0, this.width, this.height);
         
-        // ブロック
         this.blocks.forEach(b => {
             ctx.fillStyle = b.color;
             ctx.fillRect(b.x, b.y, b.w, b.h);
             ctx.strokeRect(b.x, b.y, b.w, b.h);
         });
         
-        // パドル
         PaddleData.renderToCanvas(ctx, this.p1.x, this.p1.y, this.p1.w, this.p1.h);
         if(this.mode === 'online') {
-            // 相手パドル（色は固定）
             ctx.fillStyle = '#e74c3c';
             const x = this.p2.x, y = this.p2.y, w = this.p2.w, h = this.p2.h;
             ctx.fillRect(x - w/2, y - h/2, w, h);
         }
         
-        // ボール
-        ctx.beginPath();
-        ctx.arc(this.ball.x, this.ball.y, this.ball.r, 0, Math.PI*2);
-        ctx.fillStyle = '#fff';
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(this.ball.x, this.ball.y, this.ball.r, 0, Math.PI*2);
+        ctx.fillStyle = '#fff'; ctx.fill();
         
-        // HUD
         document.getElementById('hud-right').innerText = "SCORE: " + this.score;
         if(this.mode === 'online') {
              document.getElementById('hud-left').innerText = this.role === 'p1' ? "あなた(ホスト)" : "あなた(ゲスト)";
         }
     },
     
-    // ネットワーク同期
     syncNetwork() {
         if(this.role === 'p1') {
-            // ホスト: 全状態を送る
-            Network.send({
-                type: 'sync',
-                p1x: this.p1.x, // 自分の位置
-                bx: this.ball.x, by: this.ball.y
-            });
+            Network.send({ type: 'sync', p1x: this.p1.x, bx: this.ball.x, by: this.ball.y });
         } else {
-            // ゲスト: 自分の位置だけ送る
-            Network.send({
-                type: 'input',
-                x: this.p1.x // 相手から見るとP2の位置
-            });
+            Network.send({ type: 'input', x: this.p1.x });
         }
     },
     
     onNetworkData(d) {
         if(d.type === 'sync') {
-            // ゲスト: ホストからの情報で更新
-            // ホストのP1は、ゲスト画面ではP2の位置（上）に表示
-            // 座標変換: Xはそのまま、Yは反転して表示したいが、描画関数でp2.yは固定されているのでXだけ同期
-            this.p2.x = d.p1x;
-            this.ball.x = d.bx;
-            this.ball.y = d.by;
+            this.p2.x = d.p1x; this.ball.x = d.bx; this.ball.y = d.by;
         } else if(d.type === 'input') {
-            // ホスト: ゲストの入力を反映
             this.p2.x = d.x;
         } else if(d.type === 'over') {
-            // 勝敗通知
             this.gameOver(d.win ? "あなたの勝ち！" : "あなたの負け...");
         }
     },
@@ -700,7 +635,6 @@ const Game = {
     
     retry() {
         if(this.mode === 'online') {
-            // 再戦リクエスト（今回は簡易的にリロードを促す）
             alert("通信対戦の再戦は一度メニューに戻ってください");
             location.reload();
         } else {
@@ -708,7 +642,6 @@ const Game = {
         }
     }
 };
-
 </script>
 </body>
 </html>

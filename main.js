@@ -1,9 +1,7 @@
-/* main.js - NEO SMASH BREAKER (Fixed: Removed Duplicate AudioSys) */
-
-/* --- ネットワーク管理クラス --- */
 const Network = {
     peer: null, conn: null, isHost: false,
     inputData: { m: 0, r: 0, c: false }, 
+    scanner: null, // 追加: スキャナーインスタンス保持用
 
     init() { }, 
 
@@ -13,11 +11,43 @@ const Network = {
         document.getElementById('net-menu-init').style.display = 'grid';
         document.getElementById('net-menu-host').style.display = 'none';
         document.getElementById('net-menu-connecting').style.display = 'none';
+        
+        // スキャナーエリアをリセット
+        document.getElementById('qr-reader').style.display = 'none';
     },
+
     closeMenu() {
+        this.stopScanner(); // メニューを閉じたらカメラ停止
         if(this.peer) { this.peer.destroy(); this.peer = null; }
         document.getElementById('screen-network').classList.remove('active');
         document.getElementById('screen-mode').classList.add('active');
+    },
+
+    // 追加: スキャナーの切り替え
+    toggleScanner() {
+        const reader = document.getElementById('qr-reader');
+        if (reader.style.display === 'block') {
+            this.stopScanner();
+        } else {
+            reader.style.display = 'block';
+            this.scanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: 200 });
+            this.scanner.render((decodedText) => {
+                // 読み取り成功時
+                document.getElementById('net-room-id').value = decodedText;
+                this.stopScanner();
+                // 必要ならここで自動Joinも可能: this.joinRoom();
+                if(window.AudioSys) AudioSys.playCharge(); // 音で通知
+            });
+        }
+    },
+
+    // 追加: スキャナー停止
+    stopScanner() {
+        if(this.scanner) {
+            this.scanner.clear().catch(e => console.error(e));
+            this.scanner = null;
+        }
+        document.getElementById('qr-reader').style.display = 'none';
     },
 
     initHost() {
@@ -27,6 +57,11 @@ const Network = {
         this.peer.on('open', id => {
             document.getElementById('host-id-display').innerText = id;
             this.isHost = true;
+            
+            // 追加: QRコード生成
+            const qrBox = document.getElementById('qrcode-display');
+            qrBox.innerHTML = "";
+            new QRCode(qrBox, { text: id, width: 128, height: 128 });
         });
         this.peer.on('connection', c => {
             this.conn = c;
@@ -37,8 +72,10 @@ const Network = {
     },
 
     joinRoom() {
+        this.stopScanner(); // Join時にカメラ停止
         const id = document.getElementById('net-room-id').value;
         if(!id) return alert("IDを入力してください");
+        
         document.getElementById('net-menu-init').style.display = 'none';
         document.getElementById('net-menu-connecting').style.display = 'grid';
         
